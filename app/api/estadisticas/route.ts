@@ -1,8 +1,20 @@
 import db from "@/lib/db/database";
 import { NextResponse } from "next/server";
+import { verifyAuthToken } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const cookieHeader = request.headers.get('cookie');
+    if (!cookieHeader) return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
+    const cookies = Object.fromEntries(cookieHeader.split('; ').map(c => c.split('=')));
+    const token = cookies['auth_token'];
+    if (!token) return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
+
+    const user = verifyAuthToken(token);
+    if (!user || user.rol !== 'admin') {
+      return NextResponse.json({ success: false, error: "Acceso denegado" }, { status: 403 });
+    }
+
     // Total de ventas del día
     const ventasHoy: any = db.prepare(`
       SELECT COUNT(*) as cantidad, COALESCE(SUM(total), 0) as total
@@ -99,8 +111,8 @@ export async function GET() {
     });
 
   } catch (error) {
-    return NextResponse.json({ 
-      success: false, 
+    return NextResponse.json({
+      success: false,
       error: error instanceof Error ? error.message : "Error al obtener estadísticas"
     }, { status: 500 });
   }

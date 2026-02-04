@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type Cliente = {
   id: number;
@@ -44,7 +45,19 @@ export default function ClientesPage() {
       });
   };
 
+  const router = useRouter();
+
   useEffect(() => {
+    // Verificar rol
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success || data.user.rol !== 'admin') {
+          router.push('/');
+        }
+      })
+      .catch(() => router.push('/'));
+
     cargarClientes();
   }, []);
 
@@ -83,7 +96,7 @@ export default function ClientesPage() {
   // Ver detalles de cliente
   const verDetalleCliente = async (cliente: Cliente) => {
     setClienteSeleccionado(cliente);
-    
+
     // Cargar historial de pagos
     try {
       const res = await fetch(`/api/pagos?cliente_id=${cliente.id}`);
@@ -149,7 +162,7 @@ export default function ClientesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-purple-100 p-6">
       <div className="max-w-7xl mx-auto">
-        
+
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
           <div className="flex justify-between items-center gap-4">
@@ -167,7 +180,7 @@ export default function ClientesPage() {
               >
                 ⬇️ Deudas (Excel)
               </button>
-              <Link 
+              <Link
                 href="/"
                 className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-sm md:text-base"
               >
@@ -178,7 +191,7 @@ export default function ClientesPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
+
           {/* Panel Izquierdo: Lista de Clientes */}
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <div className="flex justify-between items-center mb-4">
@@ -228,11 +241,10 @@ export default function ClientesPage() {
                   <div
                     key={cliente.id}
                     onClick={() => verDetalleCliente(cliente)}
-                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                      clienteSeleccionado?.id === cliente.id
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 hover:border-purple-300 bg-gray-50'
-                    }`}
+                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${clienteSeleccionado?.id === cliente.id
+                      ? 'border-purple-500 bg-purple-50'
+                      : 'border-gray-200 hover:border-purple-300 bg-gray-50'
+                      }`}
                   >
                     <div className="flex justify-between items-start">
                       <div>
@@ -242,9 +254,8 @@ export default function ClientesPage() {
                         )}
                       </div>
                       <div className="text-right">
-                        <p className={`font-bold text-lg ${
-                          cliente.saldo_deuda > 0 ? 'text-red-600' : 'text-green-600'
-                        }`}>
+                        <p className={`font-bold text-lg ${cliente.saldo_deuda > 0 ? 'text-red-600' : 'text-green-600'
+                          }`}>
                           ${cliente.saldo_deuda.toFixed(2)}
                         </p>
                         <p className="text-xs text-gray-500">
@@ -275,12 +286,11 @@ export default function ClientesPage() {
                   {clienteSeleccionado.telefono && (
                     <p className="text-gray-600">📞 {clienteSeleccionado.telefono}</p>
                   )}
-                  
+
                   <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4 mt-4">
                     <p className="text-sm text-gray-600 mb-1">Saldo Total:</p>
-                    <p className={`text-4xl font-bold ${
-                      clienteSeleccionado.saldo_deuda > 0 ? 'text-red-600' : 'text-green-600'
-                    }`}>
+                    <p className={`text-4xl font-bold ${clienteSeleccionado.saldo_deuda > 0 ? 'text-red-600' : 'text-green-600'
+                      }`}>
                       ${clienteSeleccionado.saldo_deuda.toFixed(2)}
                     </p>
                   </div>
@@ -326,7 +336,7 @@ export default function ClientesPage() {
                   <h3 className="text-xl font-bold text-gray-800 mb-3">
                     📜 Historial de Pagos
                   </h3>
-                  
+
                   <div className="space-y-2 max-h-[400px] overflow-y-auto">
                     {pagos.length === 0 ? (
                       <p className="text-gray-500 text-center py-4">

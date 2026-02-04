@@ -65,13 +65,23 @@ export function initDatabase() {
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       rol TEXT DEFAULT 'admin',
-      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+      sucursal_id INTEGER,
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (sucursal_id) REFERENCES sucursales(id)
     )
   `);
 
+  // Migración: Agregar columna sucursal_id a usuarios si no existe
+  try {
+    db.prepare('SELECT sucursal_id FROM usuarios LIMIT 1').get();
+  } catch (error) {
+    console.log('🔄 Agregando columna sucursal_id a tabla usuarios...');
+    db.exec('ALTER TABLE usuarios ADD COLUMN sucursal_id INTEGER REFERENCES sucursales(id)');
+  }
+
   // Insertar sucursales iniciales si no existen
   const sucursalesCount = db.prepare('SELECT COUNT(*) as count FROM sucursales').get() as { count: number };
-  
+
   if (sucursalesCount.count === 0) {
     db.prepare('INSERT INTO sucursales (nombre, direccion) VALUES (?, ?)').run('Local 1', 'Dirección Local 1');
     db.prepare('INSERT INTO sucursales (nombre, direccion) VALUES (?, ?)').run('Local 2', 'Dirección Local 2');
@@ -90,7 +100,7 @@ export function initDatabase() {
 
   // Insertar productos de ejemplo si no existen
   const productosCount = db.prepare('SELECT COUNT(*) as count FROM productos').get() as { count: number };
-  
+
   if (productosCount.count === 0) {
     // Cloro
     db.prepare(`

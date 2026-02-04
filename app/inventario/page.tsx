@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type Producto = {
   id: number;
@@ -28,7 +29,19 @@ export default function InventarioPage() {
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
 
+  const router = useRouter();
+
   useEffect(() => {
+    // Verificar rol
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success || data.user.rol !== 'admin') {
+          router.push('/');
+        }
+      })
+      .catch(() => router.push('/'));
+
     fetch('/api/stock')
       .then((res) => res.json())
       .then((data) => {

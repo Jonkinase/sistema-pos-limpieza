@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type Estadisticas = {
   hoy: { cantidad: number; total: number };
@@ -19,7 +20,19 @@ export default function DashboardPage() {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
 
+  const router = useRouter(); // Import useRouter
+
   useEffect(() => {
+    // Verificar rol
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success || data.user.rol !== 'admin') {
+          router.push('/');
+        }
+      })
+      .catch(() => router.push('/'));
+
     fetch('/api/estadisticas')
       .then(res => res.json())
       .then(data => {
@@ -60,7 +73,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-indigo-100 p-6">
       <div className="max-w-7xl mx-auto">
-        
+
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
           <div className="flex justify-between items-center">
@@ -70,7 +83,7 @@ export default function DashboardPage() {
               </h1>
               <p className="text-gray-600">Panel de control y estadísticas</p>
             </div>
-            <Link 
+            <Link
               href="/"
               className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg"
             >
@@ -81,7 +94,7 @@ export default function DashboardPage() {
 
         {/* Tarjetas de Estadísticas Principales */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-          
+
           {/* Ventas de Hoy */}
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg p-6 text-white">
             <div className="flex items-center justify-between mb-2">
@@ -125,7 +138,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
+
           {/* Ventas por Sucursal */}
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -141,10 +154,10 @@ export default function DashboardPage() {
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
+                    <div
                       className="bg-indigo-600 h-2 rounded-full"
-                      style={{ 
-                        width: `${stats.mes.total > 0 ? (sucursal.total / stats.mes.total) * 100 : 0}%` 
+                      style={{
+                        width: `${stats.mes.total > 0 ? (sucursal.total / stats.mes.total) * 100 : 0}%`
                       }}
                     ></div>
                   </div>
@@ -215,29 +228,29 @@ export default function DashboardPage() {
               ⚡ Accesos Rápidos
             </h2>
             <div className="grid grid-cols-2 gap-3 mb-6">
-              <Link 
+              <Link
                 href="/"
                 className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-4 rounded-lg text-center transition-all"
               >
-                🛒<br/>Nueva Venta
+                🛒<br />Nueva Venta
               </Link>
-              <Link 
+              <Link
                 href="/clientes"
                 className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-4 px-4 rounded-lg text-center transition-all"
               >
-                💳<br/>Clientes
+                💳<br />Clientes
               </Link>
-              <Link 
+              <Link
                 href="/presupuestos"
                 className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-4 rounded-lg text-center transition-all"
               >
-                📄<br/>Presupuestos
+                📄<br />Presupuestos
               </Link>
               <button
                 onClick={() => window.location.reload()}
                 className="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-4 rounded-lg text-center transition-all"
               >
-                🔄<br/>Actualizar
+                🔄<br />Actualizar
               </button>
             </div>
 

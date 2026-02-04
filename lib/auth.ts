@@ -9,6 +9,7 @@ export type AuthUser = {
   nombre: string;
   email: string;
   rol: string;
+  sucursal_id?: number | null;
 };
 
 export function signAuthToken(user: AuthUser) {
@@ -18,6 +19,7 @@ export function signAuthToken(user: AuthUser) {
       nombre: user.nombre,
       email: user.email,
       rol: user.rol,
+      sucursal_id: user.sucursal_id
     },
     JWT_SECRET,
     {

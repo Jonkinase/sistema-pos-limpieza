@@ -16,10 +16,10 @@ export async function POST(request: Request) {
     }
 
     const stmt = db.prepare(
-      'SELECT id, nombre, email, password_hash, rol FROM usuarios WHERE email = ?'
+      'SELECT id, nombre, email, password_hash, rol, sucursal_id FROM usuarios WHERE email = ?'
     );
     const user = stmt.get(email) as
-      | { id: number; nombre: string; email: string; password_hash: string; rol: string }
+      | { id: number; nombre: string; email: string; password_hash: string; rol: string; sucursal_id: number | null }
       | undefined;
 
     if (!user) {
@@ -42,6 +42,7 @@ export async function POST(request: Request) {
       nombre: user.nombre,
       email: user.email,
       rol: user.rol,
+      sucursal_id: user.sucursal_id
     });
 
     const response = NextResponse.json(
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
           nombre: user.nombre,
           email: user.email,
           rol: user.rol,
+          sucursal_id: user.sucursal_id
         },
       },
       { status: 200 }

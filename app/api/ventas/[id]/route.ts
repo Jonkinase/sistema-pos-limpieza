@@ -7,9 +7,12 @@ type RouteParams = {
   };
 };
 
-export async function GET(_request: Request, { params }: RouteParams) {
+// Next.js 15+ requirement: params is a Promise
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const ventaId = Number(params.id);
+    const { id } = await params;
+    const ventaId = Number(id);
+
     if (Number.isNaN(ventaId)) {
       return NextResponse.json(
         { success: false, error: "ID de venta inválido" },
