@@ -31,6 +31,7 @@ export default function ClientesPage() {
   // Formulario pago
   const [montoPago, setMontoPago] = useState('');
   const [observaciones, setObservaciones] = useState('');
+  const [descargando, setDescargando] = useState(false);
 
   // Cargar clientes
   const cargarClientes = () => {
@@ -135,25 +136,44 @@ export default function ClientesPage() {
     }
   };
 
+  const descargarReporteDeudas = () => {
+    setDescargando(true);
+    try {
+      const url = '/api/reportes/deudas';
+      window.open(url, '_blank');
+    } finally {
+      setDescargando(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-purple-100 p-6">
       <div className="max-w-7xl mx-auto">
         
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center gap-4">
             <div>
               <h1 className="text-4xl font-bold text-purple-600 mb-2">
                 💳 Cuentas Corrientes
               </h1>
               <p className="text-gray-600">Gestión de clientes y deudas</p>
             </div>
-            <Link 
-              href="/"
-              className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg"
-            >
-              ← Volver a Ventas
-            </Link>
+            <div className="flex flex-col md:flex-row gap-2">
+              <button
+                onClick={descargarReporteDeudas}
+                className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg text-sm"
+                disabled={descargando}
+              >
+                ⬇️ Deudas (Excel)
+              </button>
+              <Link 
+                href="/"
+                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-sm md:text-base"
+              >
+                ← Volver a Ventas
+              </Link>
+            </div>
           </div>
         </div>
 

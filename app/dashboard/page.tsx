@@ -16,6 +16,8 @@ type Estadisticas = {
 export default function DashboardPage() {
   const [stats, setStats] = useState<Estadisticas | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
 
   useEffect(() => {
     fetch('/api/estadisticas')
@@ -27,6 +29,17 @@ export default function DashboardPage() {
         setCargando(false);
       });
   }, []);
+
+  const descargarReporteVentas = () => {
+    const params = new URLSearchParams();
+    if (desde && hasta) {
+      params.set('desde', desde);
+      params.set('hasta', hasta);
+    }
+    params.set('formato', 'excel');
+    const url = `/api/reportes/ventas?${params.toString()}`;
+    window.open(url, '_blank');
+  };
 
   if (cargando) {
     return (
@@ -201,7 +214,7 @@ export default function DashboardPage() {
             <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
               ⚡ Accesos Rápidos
             </h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 mb-6">
               <Link 
                 href="/"
                 className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-4 rounded-lg text-center transition-all"
@@ -226,6 +239,45 @@ export default function DashboardPage() {
               >
                 🔄<br/>Actualizar
               </button>
+            </div>
+
+            <div className="mt-4 border-t pt-4">
+              <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                📑 Reporte de Ventas (Excel)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-[1fr,1fr,auto] gap-3 items-end">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Desde (opcional)
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm"
+                    value={desde}
+                    onChange={(e) => setDesde(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Hasta (opcional)
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-sm"
+                    value={hasta}
+                    onChange={(e) => setHasta(e.target.value)}
+                  />
+                </div>
+                <button
+                  onClick={descargarReporteVentas}
+                  className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg text-sm"
+                >
+                  ⬇️ Descargar Excel
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Si no seleccionas fechas, se exporta el mes actual. El archivo se descarga en formato CSV compatible con Excel.
+              </p>
             </div>
           </div>
 

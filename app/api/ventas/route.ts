@@ -42,54 +42,91 @@ export async function POST(request: Request) {
 
     console.log('💰 Total calculado:', total, '| Pagado:', pagado);
 
-    // Insertar venta
-    const ventaResult = db.prepare(`
-      INSERT INTO ventas (sucursal_id, cliente_id, total, pagado, tipo_venta)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(sucursal_id, cliente_id || null, total, pagado, tipo_venta || 'contado');
-
-    const venta_id = ventaResult.lastInsertRowid;
-
-    console.log('✅ Venta creada con ID:', venta_id);
-
-    // Insertar detalles
-    const insertDetalle = db.prepare(`
-      INSERT INTO detalle_ventas (venta_id, producto_id, cantidad_litros, precio_unitario, subtotal)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-
+    // Verificar stock disponible por producto en la sucursal
     for (const item of items) {
-      insertDetalle.run(
-        venta_id,
-        item.producto_id,
-        item.litros,
-        item.precio_unitario,
-        item.subtotal
-      );
+      const stockRow = db.prepare(
+        'SELECT cantidad_litros FROM stock WHERE producto_id = ? AND sucursal_id = ?'
+      ).get(item.producto_id, sucursal_id) as { cantidad_litros: number } | undefined;
+
+      const disponible = stockRow?.cantidad_litros ?? 0;
+
+      if (disponible < item.litros) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Stock insuficiente para el producto ID ${item.producto_id}. Disponible: ${disponible.toFixed(
+              2
+            )}L, solicitado: ${item.litros.toFixed(2)}L`,
+          },
+          { status: 400 }
+        );
+      }
     }
 
-    console.log('📝 Detalles de venta insertados');
+    // Transacción: registrar venta, detalle y actualizar stock
+    const transaction = db.transaction(() => {
+      // Insertar venta
+      const ventaResult = db.prepare(`
+        INSERT INTO ventas (sucursal_id, cliente_id, total, pagado, tipo_venta)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(sucursal_id, cliente_id || null, total, pagado, tipo_venta || 'contado');
 
-    // Si es fiado, actualizar deuda del cliente
-    if (tipo_venta === 'fiado' && cliente_id) {
-      const deuda = total - pagado;
-      
-      console.log('💳 Actualizando deuda del cliente', cliente_id, '| Deuda a sumar:', deuda);
-      
-      db.prepare(`
-        UPDATE clientes 
-        SET saldo_deuda = saldo_deuda + ?
-        WHERE id = ?
-      `).run(deuda, cliente_id);
+      const venta_id = ventaResult.lastInsertRowid;
 
-      // Verificar que se actualizó
-      const clienteActualizado: any = db.prepare('SELECT * FROM clientes WHERE id = ?').get(cliente_id);
-      console.log('✅ Cliente actualizado:', clienteActualizado);
-    }
+      console.log('✅ Venta creada con ID:', venta_id);
+
+      // Insertar detalles
+      const insertDetalle = db.prepare(`
+        INSERT INTO detalle_ventas (venta_id, producto_id, cantidad_litros, precio_unitario, subtotal)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+
+      // Actualizar stock por cada item
+      const updateStock = db.prepare(`
+        UPDATE stock
+        SET cantidad_litros = cantidad_litros - ?
+        WHERE producto_id = ? AND sucursal_id = ?
+      `);
+
+      for (const item of items) {
+        insertDetalle.run(
+          venta_id,
+          item.producto_id,
+          item.litros,
+          item.precio_unitario,
+          item.subtotal
+        );
+
+        updateStock.run(item.litros, item.producto_id, sucursal_id);
+      }
+
+      console.log('📝 Detalles de venta insertados y stock actualizado');
+
+      // Si es fiado, actualizar deuda del cliente
+      if (tipo_venta === 'fiado' && cliente_id) {
+        const deuda = total - pagado;
+        
+        console.log('💳 Actualizando deuda del cliente', cliente_id, '| Deuda a sumar:', deuda);
+        
+        db.prepare(`
+          UPDATE clientes 
+          SET saldo_deuda = saldo_deuda + ?
+          WHERE id = ?
+        `).run(deuda, cliente_id);
+
+        // Verificar que se actualizó
+        const clienteActualizado: any = db.prepare('SELECT * FROM clientes WHERE id = ?').get(cliente_id);
+        console.log('✅ Cliente actualizado:', clienteActualizado);
+      }
+
+      return venta_id;
+    });
+
+    const ventaIdResult = transaction();
 
     return NextResponse.json({
       success: true,
-      venta_id: venta_id,
+      venta_id: ventaIdResult,
       total: total,
       mensaje: "Venta registrada correctamente"
     });

@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import bcrypt from 'bcryptjs';
 
 const dbPath = path.join(process.cwd(), 'datos-limpieza.db');
 const db = new Database(dbPath);
@@ -56,12 +57,35 @@ export function initDatabase() {
     )
   `);
 
+  // Tabla de Usuarios (autenticación)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      rol TEXT DEFAULT 'admin',
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Insertar sucursales iniciales si no existen
   const sucursalesCount = db.prepare('SELECT COUNT(*) as count FROM sucursales').get() as { count: number };
   
   if (sucursalesCount.count === 0) {
     db.prepare('INSERT INTO sucursales (nombre, direccion) VALUES (?, ?)').run('Local 1', 'Dirección Local 1');
     db.prepare('INSERT INTO sucursales (nombre, direccion) VALUES (?, ?)').run('Local 2', 'Dirección Local 2');
+  }
+
+  // Insertar usuario administrador por defecto si no existe
+  const usuariosCount = db.prepare('SELECT COUNT(*) as count FROM usuarios').get() as { count: number };
+
+  if (usuariosCount.count === 0) {
+    const passwordHash = bcrypt.hashSync('admin123', 10);
+    db.prepare(`
+      INSERT INTO usuarios (nombre, email, password_hash, rol)
+      VALUES (?, ?, ?, ?)
+    `).run('Administrador', 'admin@sistema.com', passwordHash, 'admin');
   }
 
   // Insertar productos de ejemplo si no existen
