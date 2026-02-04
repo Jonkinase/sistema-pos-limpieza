@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 type Producto = {
   id: number;
   nombre: string;
+  tipo?: string;
   precio_minorista: number;
   precio_mayorista: number;
   litros_minimo_mayorista: number;
@@ -477,10 +478,13 @@ export default function PuntoDeVenta() {
                         </h3>
                         <div className="text-xs space-y-0.5">
                           <p className="text-gray-500">
-                            ${p.precio_minorista}/L • May: ${p.precio_mayorista}/L
+                            {p.tipo === 'seco'
+                              ? `$${p.precio_minorista} / u.`
+                              : `$${p.precio_minorista}/L • May: ${p.precio_mayorista}/L`
+                            }
                           </p>
                           <p className={`font-medium ${stockProducto > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                            📦 {stockProducto.toFixed(1)} L
+                            📦 {p.tipo === 'seco' ? Math.floor(stockProducto) : stockProducto.toFixed(1)} {p.tipo === 'seco' ? 'u.' : 'L'}
                           </p>
                         </div>
                       </div>
@@ -510,7 +514,7 @@ export default function PuntoDeVenta() {
                         <div>
                           <p className="font-bold text-gray-800">{item.producto_nombre}</p>
                           <p className="text-sm text-gray-600">
-                            {item.litros}L × ${item.precio_unitario}/L
+                            {item.litros}{item.tipo_precio === 'Unidad' ? 'u' : 'L'} × ${item.precio_unitario}/{item.tipo_precio === 'Unidad' ? 'u' : 'L'}
                             <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                               {item.tipo_precio}
                             </span>
@@ -590,58 +594,40 @@ export default function PuntoDeVenta() {
               </p>
             </div>
 
-            {/* Tabs Pesos / Litros */}
-            <div className="flex mb-4 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => { setModoCalculo('pesos'); setMontoLitros(''); setResultado(null); }}
-                className={`flex-1 py-2 rounded-lg font-medium transition-all ${modoCalculo === 'pesos'
-                  ? 'bg-blue-500 text-white shadow'
-                  : 'text-gray-600 hover:text-gray-800'
-                  }`}
-              >
-                💵 Por Pesos
-              </button>
-              <button
-                onClick={() => { setModoCalculo('litros'); setMontoPesos(''); setResultado(null); }}
-                className={`flex-1 py-2 rounded-lg font-medium transition-all ${modoCalculo === 'litros'
-                  ? 'bg-green-500 text-white shadow'
-                  : 'text-gray-600 hover:text-gray-800'
-                  }`}
-              >
-                🧴 Por Litros
-              </button>
-            </div>
-
-            {/* Input según modo */}
-            {modoCalculo === 'pesos' ? (
+            {/* Conditional Render based on Product Type */}
+            {productos.find(p => p.id === productoSeleccionado)?.tipo === 'seco' ? (
               <div className="mb-4">
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-3 text-sm text-orange-800">
+                  📦 Producto por Unidad
+                </div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Monto en pesos ($):
+                  Cantidad (Unidades):
                 </label>
                 <input
                   type="number"
+                  step="1"
                   autoFocus
-                  className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                  placeholder="Ej: 1000"
-                  value={montoPesos}
+                  className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
+                  placeholder="Ej: 1"
+                  value={montoLitros} // Reusing montoLitros for convenience, logically it's qty
                   onChange={(e) => {
-                    setMontoPesos(e.target.value);
-                    // Calcular automáticamente
+                    setMontoLitros(e.target.value);
                     if (e.target.value && productoSeleccionado) {
-                      const monto = parseFloat(e.target.value);
-                      if (monto > 0) {
-                        fetch('/api/calcular-venta', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            producto_id: productoSeleccionado,
-                            monto_pesos: monto
-                          })
-                        })
-                          .then(res => res.json())
-                          .then(data => {
-                            if (data.success) setResultado(data);
-                          });
+                      const qty = parseFloat(e.target.value);
+                      const prod = productos.find(p => p.id === productoSeleccionado);
+                      if (qty > 0 && prod) {
+                        setResultado({
+                          success: true,
+                          producto: prod.nombre,
+                          litros: qty,
+                          precio_por_litro: prod.precio_minorista,
+                          tipo_precio: 'Unidad',
+                          total: qty * prod.precio_minorista,
+                          ahorro: 0,
+                          isDry: true
+                        });
+                      } else {
+                        setResultado(null);
                       }
                     } else {
                       setResultado(null);
@@ -650,44 +636,109 @@ export default function PuntoDeVenta() {
                 />
               </div>
             ) : (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cantidad en litros (L):
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  autoFocus
-                  className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
-                  placeholder="Ej: 5"
-                  value={montoLitros}
-                  onChange={(e) => {
-                    setMontoLitros(e.target.value);
-                    // Calcular automáticamente
-                    if (e.target.value && productoSeleccionado) {
-                      const litros = parseFloat(e.target.value);
-                      const producto = productos.find(p => p.id === productoSeleccionado);
-                      if (litros > 0 && producto) {
-                        const esMayorista = litros >= producto.litros_minimo_mayorista;
-                        const precioUnitario = esMayorista ? producto.precio_mayorista : producto.precio_minorista;
-                        const total = litros * precioUnitario;
-                        const ahorro = esMayorista ? litros * (producto.precio_minorista - producto.precio_mayorista) : 0;
-                        setResultado({
-                          success: true,
-                          producto: producto.nombre,
-                          litros,
-                          precio_por_litro: precioUnitario,
-                          tipo_precio: esMayorista ? 'Mayorista' : 'Minorista',
-                          total,
-                          ahorro
-                        });
+              <>
+                {/* Tabs Pesos / Litros */}
+                <div className="flex mb-4 bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => { setModoCalculo('pesos'); setMontoLitros(''); setResultado(null); }}
+                    className={`flex-1 py-2 rounded-lg font-medium transition-all ${modoCalculo === 'pesos'
+                      ? 'bg-blue-500 text-white shadow'
+                      : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                  >
+                    💵 Por Pesos
+                  </button>
+                  <button
+                    onClick={() => { setModoCalculo('litros'); setMontoPesos(''); setResultado(null); }}
+                    className={`flex-1 py-2 rounded-lg font-medium transition-all ${modoCalculo === 'litros'
+                      ? 'bg-green-500 text-white shadow'
+                      : 'text-gray-600 hover:text-gray-800'
+                      }`}
+                  >
+                    🧴 Por Litros
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Input según modo (Liquid Only) */}
+            {productos.find(p => p.id === productoSeleccionado)?.tipo !== 'seco' && (
+              modoCalculo === 'pesos' ? (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Monto en pesos ($):
+                  </label>
+                  <input
+                    type="number"
+                    autoFocus
+                    className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                    placeholder="Ej: 1000"
+                    value={montoPesos}
+                    onChange={(e) => {
+                      setMontoPesos(e.target.value);
+                      // Calcular automáticamente
+                      if (e.target.value && productoSeleccionado) {
+                        const monto = parseFloat(e.target.value);
+                        if (monto > 0) {
+                          fetch('/api/calcular-venta', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              producto_id: productoSeleccionado,
+                              monto_pesos: monto
+                            })
+                          })
+                            .then(res => res.json())
+                            .then(data => {
+                              if (data.success) setResultado(data);
+                            });
+                        }
+                      } else {
+                        setResultado(null);
                       }
-                    } else {
-                      setResultado(null);
-                    }
-                  }}
-                />
-              </div>
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Cantidad en litros (L):
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    autoFocus
+                    className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                    placeholder="Ej: 5"
+                    value={montoLitros}
+                    onChange={(e) => {
+                      setMontoLitros(e.target.value);
+                      // Calcular automáticamente
+                      if (e.target.value && productoSeleccionado) {
+                        const litros = parseFloat(e.target.value);
+                        const producto = productos.find(p => p.id === productoSeleccionado);
+                        if (litros > 0 && producto) {
+                          const esMayorista = litros >= producto.litros_minimo_mayorista;
+                          const precioUnitario = esMayorista ? producto.precio_mayorista : producto.precio_minorista;
+                          const total = litros * precioUnitario;
+                          const ahorro = esMayorista ? litros * (producto.precio_minorista - producto.precio_mayorista) : 0;
+                          setResultado({
+                            success: true,
+                            producto: producto.nombre,
+                            litros,
+                            precio_por_litro: precioUnitario,
+                            tipo_precio: esMayorista ? 'Mayorista' : 'Minorista',
+                            total,
+                            ahorro
+                          });
+                        }
+                      } else {
+                        setResultado(null);
+                      }
+                    }}
+                  />
+                </div>
+              )
             )}
 
             {/* Resultado */}
@@ -695,7 +746,7 @@ export default function PuntoDeVenta() {
               <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-4">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-2xl font-bold text-green-600">
-                    {resultado.litros} L
+                    {resultado.litros} {resultado.isDry ? 'u.' : 'L'}
                   </span>
                   <span className={`px-2 py-1 rounded text-xs font-medium ${resultado.tipo_precio === 'Mayorista'
                     ? 'bg-purple-100 text-purple-800'
@@ -705,7 +756,7 @@ export default function PuntoDeVenta() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-600">
-                  ${resultado.precio_por_litro}/L × {resultado.litros}L
+                  ${resultado.precio_por_litro}/{resultado.isDry ? 'u' : 'L'} × {resultado.litros}{resultado.isDry ? 'u' : 'L'}
                 </p>
                 <p className="text-xl font-bold text-gray-800 mt-1">
                   Total: ${resultado.total.toFixed(2)}

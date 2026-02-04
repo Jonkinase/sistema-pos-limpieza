@@ -79,6 +79,14 @@ export function initDatabase() {
     db.exec('ALTER TABLE usuarios ADD COLUMN sucursal_id INTEGER REFERENCES sucursales(id)');
   }
 
+  // Migración: Agregar columna tipo a productos si no existe
+  try {
+    db.prepare('SELECT tipo FROM productos LIMIT 1').get();
+  } catch (error) {
+    console.log('🔄 Agregando columna tipo a tabla productos...');
+    db.exec("ALTER TABLE productos ADD COLUMN tipo TEXT DEFAULT 'liquido'");
+  }
+
   // Insertar sucursales iniciales si no existen
   const sucursalesCount = db.prepare('SELECT COUNT(*) as count FROM sucursales').get() as { count: number };
 

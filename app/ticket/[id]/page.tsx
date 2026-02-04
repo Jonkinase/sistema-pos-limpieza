@@ -20,6 +20,7 @@ type Item = {
   id: number;
   producto_id: number;
   producto_nombre: string;
+  producto_tipo?: string;
   cantidad_litros: number;
   precio_unitario: number;
   subtotal: number;
@@ -120,8 +121,10 @@ export default function TicketPage() {
                   </div>
                   <div className="flex justify-between text-[10px] text-gray-600">
                     <span>
-                      {item.cantidad_litros.toFixed(2)} L x $
-                      {item.precio_unitario.toFixed(2)}
+                      {item.producto_tipo === 'seco'
+                        ? `${Math.floor(item.cantidad_litros)} u. x $${item.precio_unitario.toFixed(2)}`
+                        : `${item.cantidad_litros.toFixed(2)} L x $${item.precio_unitario.toFixed(2)}`
+                      }
                     </span>
                   </div>
                 </div>

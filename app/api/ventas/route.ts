@@ -149,7 +149,11 @@ export async function GET(request: Request) {
         u.nombre as vendedor_nombre,
         s.nombre as sucursal,
         (SELECT COUNT(*) FROM detalle_ventas WHERE venta_id = v.id) as items_count,
-        (SELECT group_concat(p.nombre || ' (' || dv.cantidad_litros || 'L)', ', ') 
+        (SELECT group_concat(p.nombre || ' (' || 
+          CASE 
+            WHEN p.tipo = 'seco' THEN CAST(dv.cantidad_litros AS INT) || 'u.' 
+            ELSE dv.cantidad_litros || 'L' 
+          END || ')', ', ') 
          FROM detalle_ventas dv 
          JOIN productos p ON dv.producto_id = p.id 
          WHERE dv.venta_id = v.id) as items_resumen
