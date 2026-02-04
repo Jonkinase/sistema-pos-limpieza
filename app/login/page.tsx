@@ -62,7 +62,7 @@ export default function LoginPage() {
             </label>
             <input
               type="email"
-              className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+              className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-gray-900"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@sistema.com"
@@ -75,7 +75,7 @@ export default function LoginPage() {
             </label>
             <input
               type="password"
-              className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+              className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-gray-900"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Contraseña"

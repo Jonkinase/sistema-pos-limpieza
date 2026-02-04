@@ -321,7 +321,7 @@ export default function InventarioPage() {
               <input
                 type="text"
                 placeholder="🔍 Buscar producto..."
-                className="p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none w-full md:w-64"
+                className="p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none w-full md:w-64 text-gray-900"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
               />
@@ -348,7 +348,7 @@ export default function InventarioPage() {
                 Sucursal
               </label>
               <select
-                className="p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none"
+                className="p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none text-gray-900"
                 value={sucursalSeleccionada ?? ''}
                 onChange={(e) => setSucursalSeleccionada(Number(e.target.value))}
               >
@@ -483,7 +483,7 @@ export default function InventarioPage() {
                   <label className="block text-sm font-medium text-gray-700">Nombre del Producto</label>
                   <input
                     type="text"
-                    className="w-full mt-1 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                    className="w-full mt-1 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
                     value={formProducto.nombre}
                     onChange={e => setFormProducto({ ...formProducto, nombre: e.target.value })}
                     placeholder={formProducto.tipo === 'liquido' ? 'Ej: Detergente Premium' : 'Ej: Escoba Dura'}
@@ -500,7 +500,7 @@ export default function InventarioPage() {
                       <input
                         type="number"
                         step={formProducto.tipo === 'seco' ? "1" : "0.01"}
-                        className="w-full p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-lg font-bold text-right"
+                        className="w-full p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-lg font-bold text-right text-gray-900"
                         value={formProducto.stock_actual}
                         onChange={e => setFormProducto({ ...formProducto, stock_actual: e.target.value })}
                       />
@@ -518,7 +518,7 @@ export default function InventarioPage() {
                       <span className="absolute left-3 top-2 text-gray-500">$</span>
                       <input
                         type="number"
-                        className="w-full pl-7 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                        className="w-full pl-7 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
                         value={formProducto.precio_minorista}
                         onChange={e => setFormProducto({ ...formProducto, precio_minorista: e.target.value })}
                         placeholder="0.00"
@@ -533,7 +533,7 @@ export default function InventarioPage() {
                         <span className="absolute left-3 top-2 text-gray-500">$</span>
                         <input
                           type="number"
-                          className="w-full pl-7 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                          className="w-full pl-7 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
                           value={formProducto.precio_mayorista}
                           onChange={e => setFormProducto({ ...formProducto, precio_mayorista: e.target.value })}
                           placeholder="0.00"
@@ -548,7 +548,7 @@ export default function InventarioPage() {
                     <label className="block text-sm font-medium text-gray-700">Mínimo para Mayorista (Litros)</label>
                     <input
                       type="number"
-                      className="w-full mt-1 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                      className="w-full mt-1 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
                       value={formProducto.litros_minimo_mayorista}
                       onChange={e => setFormProducto({ ...formProducto, litros_minimo_mayorista: e.target.value })}
                     />

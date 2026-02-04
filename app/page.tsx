@@ -399,7 +399,7 @@ export default function PuntoDeVenta() {
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-gray-500">📍</span>
                 <select
-                  className={`bg-gray-100 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-blue-500 ${user?.rol !== 'admin' ? 'opacity-70 pointer-events-none bg-gray-200' : ''}`}
+                  className={`bg-gray-100 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-blue-500 text-gray-900 ${user?.rol !== 'admin' ? 'opacity-70 pointer-events-none bg-gray-200' : ''}`}
                   value={sucursalSeleccionada}
                   onChange={(e) => setSucursalSeleccionada(Number(e.target.value))}
                   disabled={user?.rol !== 'admin'}
@@ -442,7 +442,7 @@ export default function PuntoDeVenta() {
               </span>
               <input
                 type="text"
-                className="w-full p-2 pl-10 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                className="w-full p-2 pl-10 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-gray-900"
                 placeholder="Buscar producto..."
                 value={busquedaProducto}
                 onChange={(e) => setBusquedaProducto(e.target.value)}
@@ -607,7 +607,7 @@ export default function PuntoDeVenta() {
                   type="number"
                   step="1"
                   autoFocus
-                  className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none"
+                  className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none text-gray-900"
                   placeholder="Ej: 1"
                   value={montoLitros} // Reusing montoLitros for convenience, logically it's qty
                   onChange={(e) => {
@@ -671,7 +671,7 @@ export default function PuntoDeVenta() {
                   <input
                     type="number"
                     autoFocus
-                    className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                    className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-gray-900"
                     placeholder="Ej: 1000"
                     value={montoPesos}
                     onChange={(e) => {
@@ -708,7 +708,7 @@ export default function PuntoDeVenta() {
                     type="number"
                     step="0.5"
                     autoFocus
-                    className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                    className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-gray-900"
                     placeholder="Ej: 5"
                     value={montoLitros}
                     onChange={(e) => {

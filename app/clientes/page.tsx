@@ -212,14 +212,14 @@ export default function ClientesPage() {
                 <input
                   type="text"
                   placeholder="Nombre del cliente"
-                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-gray-900"
                   value={nuevoNombre}
                   onChange={(e) => setNuevoNombre(e.target.value)}
                 />
                 <input
                   type="text"
                   placeholder="Teléfono (opcional)"
-                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-gray-900"
                   value={nuevoTelefono}
                   onChange={(e) => setNuevoTelefono(e.target.value)}
                 />
@@ -311,14 +311,14 @@ export default function ClientesPage() {
                     <input
                       type="number"
                       placeholder="Monto del pago"
-                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-gray-900"
                       value={montoPago}
                       onChange={(e) => setMontoPago(e.target.value)}
                     />
                     <input
                       type="text"
                       placeholder="Observaciones (opcional)"
-                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-gray-900"
                       value={observaciones}
                       onChange={(e) => setObservaciones(e.target.value)}
                     />

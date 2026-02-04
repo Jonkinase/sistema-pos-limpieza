@@ -146,7 +146,7 @@ export default function UsuariosPage() {
                                 <input
                                     type="text"
                                     required
-                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                                     value={nombre}
                                     onChange={e => setNombre(e.target.value)}
                                 />
@@ -156,7 +156,7 @@ export default function UsuariosPage() {
                                 <input
                                     type="email"
                                     required
-                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                                     value={email}
                                     onChange={e => setEmail(e.target.value)}
                                 />
@@ -167,7 +167,7 @@ export default function UsuariosPage() {
                                     type="password"
                                     required
                                     minLength={4}
-                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
                                 />
@@ -175,7 +175,7 @@ export default function UsuariosPage() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Rol</label>
                                 <select
-                                    className="w-full mt-1 p-2 border rounded-lg bg-white"
+                                    className="w-full mt-1 p-2 border rounded-lg bg-white text-gray-900"
                                     value={rol}
                                     onChange={e => setRol(e.target.value)}
                                 >
@@ -189,7 +189,7 @@ export default function UsuariosPage() {
                                     <label className="block text-sm font-medium text-gray-700">Asignar Sucursal</label>
                                     <select
                                         required
-                                        className="w-full mt-1 p-2 border-2 border-orange-200 rounded-lg bg-orange-50"
+                                        className="w-full mt-1 p-2 border-2 border-orange-200 rounded-lg bg-orange-50 text-gray-900"
                                         value={sucursalId}
                                         onChange={e => setSucursalId(e.target.value)}
                                     >
@@ -236,8 +236,8 @@ export default function UsuariosPage() {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-bold ${u.rol === 'admin'
-                                                        ? 'bg-purple-100 text-purple-700'
-                                                        : 'bg-blue-100 text-blue-700'
+                                                    ? 'bg-purple-100 text-purple-700'
+                                                    : 'bg-blue-100 text-blue-700'
                                                     }`}>
                                                     {u.rol === 'admin' ? 'Administrador' : 'Vendedor'}
                                                 </span>
