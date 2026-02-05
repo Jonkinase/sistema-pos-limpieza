@@ -348,28 +348,22 @@ export default function PuntoDeVenta() {
               </h1>
               <div className="flex gap-2 flex-wrap">
                 {user?.rol === 'admin' && (
-                  <>
-                    <Link
-                      href="/dashboard"
-                      className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-1.5 px-4 rounded-lg text-sm"
-                    >
-                      📊 Dashboard
-                    </Link>
-                    <Link
-                      href="/usuarios"
-                      className="bg-gray-700 hover:bg-gray-800 text-white font-bold py-1.5 px-4 rounded-lg text-sm"
-                    >
-                      👥 Usuarios
-                    </Link>
-                  </>
+                  <Link
+                    href="/dashboard"
+                    className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-1.5 px-4 rounded-lg text-sm"
+                  >
+                    📊 Dashboard
+                  </Link>
                 )}
-                {/* Available to all? Or Admin + Seller? 
-                    Seller needs "Cuentas" (to Select client)? No, plan said Hide Cuentas.
-                    But POS needs to search clients. The prompt said: 
-                    "Sellers cannot access /dashboard, /inventario, /clientes" 
-                    So we hide the links.
-                */}
-                {user?.rol === 'admin' && (
+                {(user?.rol === 'admin' || user?.rol === 'encargado') && (
+                  <Link
+                    href="/usuarios"
+                    className="bg-gray-700 hover:bg-gray-800 text-white font-bold py-1.5 px-4 rounded-lg text-sm"
+                  >
+                    👥 Usuarios
+                  </Link>
+                )}
+                {(user?.rol === 'admin' || user?.rol === 'encargado') && (
                   <>
                     <Link
                       href="/clientes"
@@ -411,7 +405,7 @@ export default function PuntoDeVenta() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500 font-medium">
-                  Hola, {user?.nombre || '...'} ({user?.rol === 'admin' ? 'Admin' : 'Vendedor'})
+                  Hola, {user?.nombre || '...'} ({user?.rol === 'admin' ? 'Admin' : (user?.rol === 'encargado' ? 'Encargado' : 'Vendedor')})
                 </span>
                 <button
                   onClick={cerrarSesion}

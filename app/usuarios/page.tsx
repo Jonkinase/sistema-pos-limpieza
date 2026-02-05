@@ -23,6 +23,7 @@ export default function UsuariosPage() {
     const router = useRouter();
     const [usuarios, setUsuarios] = useState<User[]>([]);
     const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+    const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     // Form states
@@ -39,6 +40,17 @@ export default function UsuariosPage() {
 
     const fetchData = async () => {
         try {
+            // Cargar info del usuario actual
+            const resMe = await fetch('/api/auth/me');
+            const dataMe = await resMe.json();
+            if (dataMe.success) {
+                setUser(dataMe.user);
+                if (dataMe.user.rol === 'encargado') {
+                    setSucursalId(dataMe.user.sucursal_id.toString());
+                    setRol('vendedor');
+                }
+            }
+
             // Cargar sucursales para el form
             const resSuc = await fetch('/api/productos');
             const dataSuc = await resSuc.json();
@@ -69,8 +81,8 @@ export default function UsuariosPage() {
             return;
         }
 
-        if (rol === 'vendedor' && !sucursalId) {
-            alert('Debes asignar una sucursal al vendedor');
+        if ((rol === 'vendedor' || rol === 'encargado') && !sucursalId) {
+            alert('Debes asignar una sucursal');
             return;
         }
 
@@ -84,7 +96,7 @@ export default function UsuariosPage() {
                     email,
                     password,
                     rol,
-                    sucursal_id: rol === 'vendedor' ? Number(sucursalId) : null
+                    sucursal_id: (rol === 'vendedor' || rol === 'encargado') ? Number(sucursalId) : null
                 })
             });
 
@@ -180,26 +192,32 @@ export default function UsuariosPage() {
                                     onChange={e => setRol(e.target.value)}
                                 >
                                     <option value="vendedor">Vendedor</option>
-                                    <option value="admin">Administrador</option>
+                                    {user?.rol === 'admin' && (
+                                        <>
+                                            <option value="encargado">Encargado</option>
+                                            <option value="admin">Administrador</option>
+                                        </>
+                                    )}
                                 </select>
                             </div>
 
-                            {rol === 'vendedor' && (
+                            {(rol === 'vendedor' || rol === 'encargado') && (
                                 <div className="animate-in fade-in slide-in-from-top-2 duration-200">
                                     <label className="block text-sm font-medium text-gray-700">Asignar Sucursal</label>
                                     <select
                                         required
-                                        className="w-full mt-1 p-2 border-2 border-orange-200 rounded-lg bg-orange-50 text-gray-900"
-                                        value={sucursalId}
+                                        disabled={user?.rol === 'encargado'}
+                                        className={`w-full mt-1 p-2 border-2 border-orange-200 rounded-lg bg-orange-50 text-gray-900 ${user?.rol === 'encargado' ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                        value={user?.rol === 'encargado' ? user.sucursal_id : sucursalId}
                                         onChange={e => setSucursalId(e.target.value)}
                                     >
-                                        <option value="">Selecciona una sucursal...</option>
+                                        {user?.rol === 'admin' && <option value="">Selecciona una sucursal...</option>}
                                         {sucursales.map(s => (
                                             <option key={s.id} value={s.id}>{s.nombre}</option>
                                         ))}
                                     </select>
                                     <p className="text-xs text-orange-600 mt-1">
-                                        ⚠️ El vendedor solo podrá operar en esta sucursal.
+                                        ⚠️ {user?.rol === 'encargado' ? 'Como encargado, tus vendedores se asignan a tu local.' : 'El vendedor solo podrá operar en esta sucursal.'}
                                     </p>
                                 </div>
                             )}
@@ -239,7 +257,7 @@ export default function UsuariosPage() {
                                                     ? 'bg-purple-100 text-purple-700'
                                                     : 'bg-blue-100 text-blue-700'
                                                     }`}>
-                                                    {u.rol === 'admin' ? 'Administrador' : 'Vendedor'}
+                                                    {u.rol === 'admin' ? 'Administrador' : u.rol === 'encargado' ? 'Encargado' : 'Vendedor'}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-gray-600">

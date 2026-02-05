@@ -62,11 +62,11 @@ export default function ClientesPage() {
     fetch('/api/auth/me')
       .then(res => res.json())
       .then(data => {
-        if (!data.success || data.user.rol !== 'admin') {
+        if (!data.success || (data.user.rol !== 'admin' && data.user.rol !== 'encargado')) {
           router.push('/');
         } else {
           setUser(data.user);
-          // Si el admin tiene una sucursal asignada, la usamos por defecto
+          // Si el usuario (admin o encargado) tiene una sucursal asignada, la usamos por defecto
           if (data.user.sucursal_id) {
             setSucursalSeleccionada(data.user.sucursal_id);
             cargarClientes(data.user.sucursal_id);

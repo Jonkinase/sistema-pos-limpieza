@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { nombre, telefono, sucursal_id: sucursalIdBody } = body;
 
-    // Si es admin usa el de body, si no, el suyo
+    // Si es admin usa el de body, si no (vendedor o encargado), el suyo
     const sucursal_id = (user.rol === 'admin' && sucursalIdBody)
       ? sucursalIdBody
       : user.sucursal_id;

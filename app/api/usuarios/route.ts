@@ -16,16 +16,25 @@ function getUserFromRequest(request: Request) {
 export async function GET(request: Request) {
     try {
         const user = getUserFromRequest(request);
-        if (!user || user.rol !== 'admin') {
+        if (!user || (user.rol !== 'admin' && user.rol !== 'encargado')) {
             return NextResponse.json({ success: false, error: "No autorizado" }, { status: 403 });
         }
 
-        const usuarios = db.prepare(`
-      SELECT u.id, u.nombre, u.email, u.rol, u.sucursal_id, s.nombre as sucursal_nombre, u.creado_en
-      FROM usuarios u
-      LEFT JOIN sucursales s ON u.sucursal_id = s.id
-      ORDER BY u.creado_en DESC
-    `).all();
+        let query = `
+            SELECT u.id, u.nombre, u.email, u.rol, u.sucursal_id, s.nombre as sucursal_nombre, u.creado_en
+            FROM usuarios u
+            LEFT JOIN sucursales s ON u.sucursal_id = s.id
+        `;
+        let params: any[] = [];
+
+        if (user.rol === 'encargado') {
+            query += ` WHERE u.sucursal_id = ? AND u.rol != 'admin'`;
+            params.push(user.sucursal_id);
+        }
+
+        query += ` ORDER BY u.creado_en DESC`;
+
+        const usuarios = db.prepare(query).all(params);
 
         return NextResponse.json({ success: true, usuarios });
     } catch (error) {
@@ -36,12 +45,18 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const user = getUserFromRequest(request);
-        if (!user || user.rol !== 'admin') {
+        if (!user || (user.rol !== 'admin' && user.rol !== 'encargado')) {
             return NextResponse.json({ success: false, error: "No autorizado" }, { status: 403 });
         }
 
         const body = await request.json();
-        const { nombre, email, password, rol, sucursal_id } = body;
+        let { nombre, email, password, rol, sucursal_id } = body;
+
+        // Si es encargado, forzar su sucursal y rol vendedor
+        if (user.rol === 'encargado') {
+            sucursal_id = user.sucursal_id;
+            rol = 'vendedor';
+        }
 
         if (!nombre || !email || !password || !rol) {
             return NextResponse.json({ success: false, error: "Faltan datos requeridos" }, { status: 400 });
@@ -72,7 +87,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
     try {
         const user = getUserFromRequest(request);
-        if (!user || user.rol !== 'admin') {
+        if (!user || (user.rol !== 'admin' && user.rol !== 'encargado')) {
             return NextResponse.json({ success: false, error: "No autorizado" }, { status: 403 });
         }
 
@@ -81,6 +96,20 @@ export async function DELETE(request: Request) {
 
         if (!id) return NextResponse.json({ success: false, error: "ID requerido" }, { status: 400 });
         if (Number(id) === user.id) return NextResponse.json({ success: false, error: "No puedes eliminar tu propio usuario" }, { status: 400 });
+
+        // Verificar permisos de eliminación
+        const targetUser: any = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id);
+        if (!targetUser) return NextResponse.json({ success: false, error: "Usuario no encontrado" }, { status: 404 });
+
+        if (user.rol === 'encargado') {
+            if (targetUser.sucursal_id !== user.sucursal_id || targetUser.rol !== 'vendedor') {
+                return NextResponse.json({ success: false, error: "No tienes permiso para eliminar este usuario" }, { status: 403 });
+            }
+        } else if (user.rol === 'admin') {
+            if (targetUser.rol === 'admin' && targetUser.id === 1) { // Proteger admin principal opcionalmente
+                // return NextResponse.json({ success: false, error: "No se puede eliminar el administrador raíz" }, { status: 400 });
+            }
+        }
 
         db.prepare('DELETE FROM usuarios WHERE id = ?').run(id);
 

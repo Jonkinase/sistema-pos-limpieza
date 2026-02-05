@@ -26,6 +26,7 @@ export default function InventarioPage() {
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
 
@@ -66,8 +67,13 @@ export default function InventarioPage() {
     fetch('/api/auth/me')
       .then(res => res.json())
       .then(data => {
-        if (!data.success || data.user.rol !== 'admin') {
+        if (!data.success || (data.user.rol !== 'admin' && data.user.rol !== 'encargado')) {
           router.push('/');
+        } else {
+          setUser(data.user);
+          if (data.user.rol !== 'admin' && data.user.sucursal_id) {
+            setSucursalSeleccionada(data.user.sucursal_id);
+          }
         }
       })
       .catch(() => router.push('/'));
@@ -348,9 +354,10 @@ export default function InventarioPage() {
                 Sucursal
               </label>
               <select
-                className="p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none text-gray-900"
+                className={`p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none text-gray-900 ${user?.rol !== 'admin' ? 'opacity-70 pointer-events-none bg-gray-200' : ''}`}
                 value={sucursalSeleccionada ?? ''}
                 onChange={(e) => setSucursalSeleccionada(Number(e.target.value))}
+                disabled={user?.rol !== 'admin'}
               >
                 {sucursales.map((s) => (
                   <option key={s.id} value={s.id}>

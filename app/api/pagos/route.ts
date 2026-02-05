@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { cliente_id, monto, observaciones, sucursal_id: sucursalIdBody } = body;
 
-    // Si es admin usa el de body, si no, el suyo
+    // Si es admin usa el de body, si no (vendedor o encargado), el suyo
     const sucursal_id = (user.rol === 'admin' && sucursalIdBody)
       ? sucursalIdBody
       : user.sucursal_id;
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Si es admin usa param si existe, si no, el suyo
+    // Si es admin usa param si existe, si no (vendedor o encargado), el suyo
     const sucursal_id = (user.rol === 'admin' && sucursalIdParam)
       ? parseInt(sucursalIdParam)
       : user.sucursal_id;
