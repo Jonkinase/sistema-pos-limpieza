@@ -9,6 +9,12 @@ type Cliente = {
   nombre: string;
   telefono: string;
   saldo_deuda: number;
+  sucursal_id: number;
+};
+
+type Sucursal = {
+  id: number;
+  nombre: string;
 };
 
 type Pago = {
@@ -20,6 +26,9 @@ type Pago = {
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number>(1);
+  const [user, setUser] = useState<any>(null);
   const [clienteSeleccionado, setClienteSeleccionado] = useState<Cliente | null>(null);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [mostrarFormCliente, setMostrarFormCliente] = useState(false);
@@ -35,8 +44,9 @@ export default function ClientesPage() {
   const [descargando, setDescargando] = useState(false);
 
   // Cargar clientes
-  const cargarClientes = () => {
-    fetch('/api/clientes')
+  const cargarClientes = (sid?: number) => {
+    const targetSid = sid || sucursalSeleccionada;
+    fetch(`/api/clientes?sucursal_id=${targetSid}`)
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -48,18 +58,42 @@ export default function ClientesPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Verificar rol
+    // Verificar rol y cargar datos
     fetch('/api/auth/me')
       .then(res => res.json())
       .then(data => {
         if (!data.success || data.user.rol !== 'admin') {
           router.push('/');
+        } else {
+          setUser(data.user);
+          // Si el admin tiene una sucursal asignada, la usamos por defecto
+          if (data.user.sucursal_id) {
+            setSucursalSeleccionada(data.user.sucursal_id);
+            cargarClientes(data.user.sucursal_id);
+          } else {
+            cargarClientes(1); // Default for global admin
+          }
         }
       })
       .catch(() => router.push('/'));
 
-    cargarClientes();
+    // Cargar sucursales (reutilizando api de productos que las devuelve)
+    fetch('/api/productos')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setSucursales(data.sucursales || []);
+        }
+      });
   }, []);
+
+  // Recargar clientes al cambiar sucursal
+  useEffect(() => {
+    if (user) {
+      cargarClientes();
+      setClienteSeleccionado(null);
+    }
+  }, [sucursalSeleccionada]);
 
   // Crear nuevo cliente
   const crearCliente = async () => {
@@ -74,7 +108,8 @@ export default function ClientesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nombre: nuevoNombre,
-          telefono: nuevoTelefono
+          telefono: nuevoTelefono,
+          sucursal_id: sucursalSeleccionada
         })
       });
 
@@ -99,7 +134,7 @@ export default function ClientesPage() {
 
     // Cargar historial de pagos
     try {
-      const res = await fetch(`/api/pagos?cliente_id=${cliente.id}`);
+      const res = await fetch(`/api/pagos?cliente_id=${cliente.id}&sucursal_id=${sucursalSeleccionada}`);
       const data = await res.json();
       if (data.success) {
         setPagos(data.pagos);
@@ -129,7 +164,8 @@ export default function ClientesPage() {
         body: JSON.stringify({
           cliente_id: clienteSeleccionado.id,
           monto: monto,
-          observaciones: observaciones
+          observaciones: observaciones,
+          sucursal_id: sucursalSeleccionada
         })
       });
 
@@ -152,7 +188,7 @@ export default function ClientesPage() {
   const descargarReporteDeudas = () => {
     setDescargando(true);
     try {
-      const url = '/api/reportes/deudas';
+      const url = `/api/reportes/deudas?sucursal_id=${sucursalSeleccionada}`;
       window.open(url, '_blank');
     } finally {
       setDescargando(false);
@@ -172,20 +208,36 @@ export default function ClientesPage() {
               </h1>
               <p className="text-gray-600">Gestión de clientes y deudas</p>
             </div>
-            <div className="flex flex-col md:flex-row gap-2">
-              <button
-                onClick={descargarReporteDeudas}
-                className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg text-sm"
-                disabled={descargando}
-              >
-                ⬇️ Deudas (Excel)
-              </button>
-              <Link
-                href="/"
-                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-sm md:text-base"
-              >
-                ← Volver a Ventas
-              </Link>
+            <div className="flex flex-col md:flex-row gap-4 items-center">
+              {user?.rol === 'admin' && (
+                <div className="flex items-center gap-2 bg-purple-50 p-2 rounded-lg border border-purple-200">
+                  <span className="text-sm font-medium text-purple-700">📍 Sucursal:</span>
+                  <select
+                    className="bg-white border-2 border-purple-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:border-purple-500 text-gray-900"
+                    value={sucursalSeleccionada}
+                    onChange={(e) => setSucursalSeleccionada(Number(e.target.value))}
+                  >
+                    {sucursales.map(s => (
+                      <option key={s.id} value={s.id}>{s.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="flex flex-col md:flex-row gap-2">
+                <button
+                  onClick={descargarReporteDeudas}
+                  className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg text-sm"
+                  disabled={descargando}
+                >
+                  ⬇️ Deudas (Excel)
+                </button>
+                <Link
+                  href="/"
+                  className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-sm md:text-base"
+                >
+                  ← Volver a Ventas
+                </Link>
+              </div>
             </div>
           </div>
         </div>

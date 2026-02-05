@@ -283,7 +283,7 @@ export default function PuntoDeVenta() {
       if (!clienteNombre) return;
 
       // Buscar cliente
-      const resClientes = await fetch('/api/clientes');
+      const resClientes = await fetch(`/api/clientes?sucursal_id=${sucursalSeleccionada}`);
       const dataClientes = await resClientes.json();
       const cliente = dataClientes.clientes.find((c: any) =>
         c.nombre.toLowerCase().includes(clienteNombre.toLowerCase())

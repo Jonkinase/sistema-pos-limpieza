@@ -50,10 +50,12 @@ export function initDatabase() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS clientes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sucursal_id INTEGER,
       nombre TEXT NOT NULL,
       telefono TEXT,
       saldo_deuda REAL DEFAULT 0,
-      activo INTEGER DEFAULT 1
+      activo INTEGER DEFAULT 1,
+      FOREIGN KEY (sucursal_id) REFERENCES sucursales(id)
     )
   `);
 
@@ -85,6 +87,17 @@ export function initDatabase() {
   } catch (error) {
     console.log('🔄 Agregando columna tipo a tabla productos...');
     db.exec("ALTER TABLE productos ADD COLUMN tipo TEXT DEFAULT 'liquido'");
+  }
+
+  // Migración: Agregar columna sucursal_id a clientes si no existe
+  try {
+    db.prepare('SELECT sucursal_id FROM clientes LIMIT 1').get();
+  } catch (error) {
+    console.log('🔄 Agregando columna sucursal_id a tabla clientes...');
+    db.exec('ALTER TABLE clientes ADD COLUMN sucursal_id INTEGER REFERENCES sucursales(id)');
+
+    // Asignar clientes actuales a Local 1 (ID 1)
+    db.prepare('UPDATE clientes SET sucursal_id = 1 WHERE sucursal_id IS NULL').run();
   }
 
   // Insertar sucursales iniciales si no existen

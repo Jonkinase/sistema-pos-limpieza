@@ -1,10 +1,26 @@
 import db from "@/lib/db/database";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyAuthToken } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const rows: any[] = db
-      .prepare(
-        `
+    const token = request.cookies.get('auth_token')?.value;
+    const user = token ? verifyAuthToken(token) : null;
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const sucursalIdParam = searchParams.get('sucursal_id');
+
+    // Si es admin puede ver cualquier sucursal pasada por param, si no, usa la suya
+    const sucursal_id = (user.rol === 'admin' && sucursalIdParam)
+      ? parseInt(sucursalIdParam)
+      : user.sucursal_id;
+
+    const query = sucursal_id
+      ? `
         SELECT 
           c.id,
           c.nombre,
@@ -13,10 +29,23 @@ export async function GET() {
         FROM clientes c
         WHERE c.activo = 1
           AND c.saldo_deuda > 0
+          AND c.sucursal_id = ?
         ORDER BY c.saldo_deuda DESC
       `
-      )
-      .all();
+      : `
+        SELECT 
+          c.id,
+          c.nombre,
+          c.telefono,
+          c.saldo_deuda
+        FROM clientes c
+        WHERE c.activo = 1
+          AND c.saldo_deuda > 0
+          AND c.sucursal_id IS NULL
+        ORDER BY c.saldo_deuda DESC
+      `;
+
+    const rows: any[] = db.prepare(query).all(sucursal_id ? [sucursal_id] : []);
 
     const headers = ["ID", "Nombre", "Teléfono", "Saldo Deuda"];
 

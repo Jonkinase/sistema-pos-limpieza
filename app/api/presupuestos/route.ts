@@ -1,5 +1,6 @@
 import db from "@/lib/db/database";
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
+import { verifyAuthToken } from "@/lib/auth";
 
 // Crear tabla de presupuestos
 db.exec(`
@@ -74,31 +75,62 @@ export async function POST(request: Request) {
     });
 
   } catch (error) {
-    return NextResponse.json({ 
-      success: false, 
+    return NextResponse.json({
+      success: false,
       error: error instanceof Error ? error.message : "Error al guardar presupuesto"
     }, { status: 500 });
   }
 }
 
 // Obtener presupuestos
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const presupuestos = db.prepare(`
-      SELECT p.*, s.nombre as sucursal
-      FROM presupuestos p
-      JOIN sucursales s ON p.sucursal_id = s.id
-      ORDER BY p.fecha DESC
-      LIMIT 100
-    `).all();
+    const token = request.cookies.get('auth_token')?.value;
+    const user = token ? verifyAuthToken(token) : null;
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const sucursalIdParam = searchParams.get('sucursal_id');
+
+    // Si es admin puede ver cualquier sucursal pasada por param, si no, usa la suya
+    const sucursal_id = (user.rol === 'admin' && sucursalIdParam)
+      ? parseInt(sucursalIdParam)
+      : user.sucursal_id;
+
+    if (!sucursal_id && user.rol !== 'admin') {
+      return NextResponse.json({ success: false, error: "Sucursal no definida" }, { status: 400 });
+    }
+
+    const query = sucursal_id
+      ? `
+        SELECT p.*, s.nombre as sucursal
+        FROM presupuestos p
+        JOIN sucursales s ON p.sucursal_id = s.id
+        WHERE p.sucursal_id = ?
+        ORDER BY p.fecha DESC
+        LIMIT 100
+      `
+      : `
+        SELECT p.*, s.nombre as sucursal
+        FROM presupuestos p
+        JOIN sucursales s ON p.sucursal_id = s.id
+        WHERE p.sucursal_id IS NULL
+        ORDER BY p.fecha DESC
+        LIMIT 100
+      `;
+
+    const presupuestos = db.prepare(query).all(sucursal_id ? [sucursal_id] : []);
 
     return NextResponse.json({
       success: true,
       presupuestos
     });
   } catch (error) {
-    return NextResponse.json({ 
-      success: false, 
+    return NextResponse.json({
+      success: false,
       error: error instanceof Error ? error.message : "Error al obtener presupuestos"
     }, { status: 500 });
   }
