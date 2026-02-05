@@ -15,12 +15,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const stmt = db.prepare(
-      'SELECT id, nombre, email, password_hash, rol, sucursal_id FROM usuarios WHERE email = ?'
+    const result = await db.query(
+      'SELECT id, nombre, email, password_hash, rol, sucursal_id FROM usuarios WHERE email = $1',
+      [email]
     );
-    const user = stmt.get(email) as
-      | { id: number; nombre: string; email: string; password_hash: string; rol: string; sucursal_id: number | null }
-      | undefined;
+    const user = result.rows[0];
 
     if (!user) {
       return NextResponse.json(

@@ -2,20 +2,9 @@ import db from "@/lib/db/database";
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuthToken } from "@/lib/auth";
 
-// Crear tabla de pagos
-db.exec(`
-  CREATE TABLE IF NOT EXISTS pagos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cliente_id INTEGER NOT NULL,
-    monto REAL NOT NULL,
-    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-    observaciones TEXT,
-    FOREIGN KEY (cliente_id) REFERENCES clientes(id)
-  )
-`);
-
 // Registrar un pago
 export async function POST(request: NextRequest) {
+  const client = await db.connect();
   try {
     const token = request.cookies.get('auth_token')?.value;
     const user = token ? verifyAuthToken(token) : null;
@@ -41,10 +30,12 @@ export async function POST(request: NextRequest) {
 
     // Verificar que el cliente pertenece a la sucursal (o NULL para admin global que no pase SID)
     const clienteQuery = sucursal_id
-      ? 'SELECT * FROM clientes WHERE id = ? AND sucursal_id = ?'
-      : 'SELECT * FROM clientes WHERE id = ? AND sucursal_id IS NULL';
+      ? 'SELECT * FROM clientes WHERE id = $1 AND sucursal_id = $2'
+      : 'SELECT * FROM clientes WHERE id = $1 AND sucursal_id IS NULL';
     const clienteParams = sucursal_id ? [cliente_id, sucursal_id] : [cliente_id];
-    const cliente: any = db.prepare(clienteQuery).get(...clienteParams);
+
+    const clienteResult = await client.query(clienteQuery, clienteParams);
+    const cliente = clienteResult.rows[0];
 
     if (!cliente) {
       return NextResponse.json({
@@ -53,40 +44,49 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
-    if (monto > cliente.saldo_deuda) {
+    if (parseFloat(monto) > parseFloat(cliente.saldo_deuda)) {
       return NextResponse.json({
         success: false,
         error: `El monto ($${monto}) es mayor a la deuda ($${cliente.saldo_deuda})`
       }, { status: 400 });
     }
 
+    await client.query('BEGIN');
+
     // Registrar el pago
-    const result = db.prepare(`
+    const result = await client.query(`
       INSERT INTO pagos (cliente_id, monto, observaciones)
-      VALUES (?, ?, ?)
-    `).run(cliente_id, monto, observaciones || null);
+      VALUES ($1, $2, $3)
+      RETURNING id
+    `, [cliente_id, monto, observaciones || null]);
 
     // Actualizar saldo del cliente
-    db.prepare(`
+    await client.query(`
       UPDATE clientes 
-      SET saldo_deuda = saldo_deuda - ?
-      WHERE id = ?
-    `).run(monto, cliente_id);
+      SET saldo_deuda = saldo_deuda - $1
+      WHERE id = $2
+    `, [monto, cliente_id]);
 
-    const nuevoSaldo = cliente.saldo_deuda - monto;
+    await client.query('COMMIT');
+
+    const nuevoSaldo = parseFloat(cliente.saldo_deuda) - parseFloat(monto);
 
     return NextResponse.json({
       success: true,
-      pago_id: result.lastInsertRowid,
+      pago_id: result.rows[0].id,
       nuevo_saldo: nuevoSaldo,
       mensaje: "Pago registrado correctamente"
     });
 
   } catch (error) {
+    await client.query('ROLLBACK');
+    console.error(error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : "Error al registrar pago"
     }, { status: 500 });
+  } finally {
+    client.release();
   }
 }
 
@@ -118,23 +118,29 @@ export async function GET(request: NextRequest) {
 
     // Verificar que el cliente pertenece a la sucursal
     const clienteQuery = sucursal_id
-      ? 'SELECT id FROM clientes WHERE id = ? AND sucursal_id = ?'
-      : 'SELECT id FROM clientes WHERE id = ? AND sucursal_id IS NULL';
+      ? 'SELECT id FROM clientes WHERE id = $1 AND sucursal_id = $2'
+      : 'SELECT id FROM clientes WHERE id = $1 AND sucursal_id IS NULL';
     const clienteParams = sucursal_id ? [cliente_id, sucursal_id] : [cliente_id];
-    const cliente: any = db.prepare(clienteQuery).get(...clienteParams);
 
-    if (!cliente) {
+    const clienteResult = await db.query(clienteQuery, clienteParams);
+
+    if (clienteResult.rowCount === 0) {
       return NextResponse.json({
         success: false,
         error: "Cliente no encontrado o no pertenece a esta sucursal"
       }, { status: 404 });
     }
 
-    const pagos = db.prepare(`
+    const pagosResult = await db.query(`
       SELECT * FROM pagos 
-      WHERE cliente_id = ?
+      WHERE cliente_id = $1
       ORDER BY fecha DESC
-    `).all(cliente_id);
+    `, [cliente_id]);
+
+    const pagos = pagosResult.rows.map(p => ({
+      ...p,
+      monto: parseFloat(p.monto)
+    }));
 
     return NextResponse.json({
       success: true,
@@ -142,6 +148,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
+    console.error(error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : "Error al obtener pagos"

@@ -2,45 +2,8 @@ import db from "@/lib/db/database";
 import { NextResponse } from "next/server";
 import { verifyAuthToken } from "@/lib/auth";
 
-// Crear tabla de ventas si no existe
-db.exec(`
-  CREATE TABLE IF NOT EXISTS ventas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sucursal_id INTEGER NOT NULL,
-    cliente_id INTEGER,
-    usuario_id INTEGER,
-    total REAL NOT NULL,
-    pagado REAL NOT NULL,
-    tipo_venta TEXT DEFAULT 'contado',
-    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id),
-    FOREIGN KEY (cliente_id) REFERENCES clientes(id),
-    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-  )
-`);
-
-// Migración: Agregar columna usuario_id si no existe
-try {
-  db.prepare('SELECT usuario_id FROM ventas LIMIT 1').get();
-} catch (error) {
-  console.log('🔄 Agregando columna usuario_id a tabla ventas...');
-  db.exec('ALTER TABLE ventas ADD COLUMN usuario_id INTEGER REFERENCES usuarios(id)');
-}
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS detalle_ventas (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    venta_id INTEGER NOT NULL,
-    producto_id INTEGER NOT NULL,
-    cantidad_litros REAL NOT NULL,
-    precio_unitario REAL NOT NULL,
-    subtotal REAL NOT NULL,
-    FOREIGN KEY (venta_id) REFERENCES ventas(id),
-    FOREIGN KEY (producto_id) REFERENCES productos(id)
-  )
-`);
-
 export async function POST(request: Request) {
+  const client = await db.connect();
   try {
     const body = await request.json();
     const { sucursal_id, items, tipo_venta, cliente_id, monto_pagado } = body;
@@ -66,74 +29,74 @@ export async function POST(request: Request) {
 
     // Verificar stock disponible por producto en la sucursal
     for (const item of items) {
-      const stockRow = db.prepare(
-        'SELECT cantidad_litros FROM stock WHERE producto_id = ? AND sucursal_id = ?'
-      ).get(item.producto_id, sucursal_id) as { cantidad_litros: number } | undefined;
-
+      const stockResult = await client.query(
+        'SELECT cantidad_litros FROM stock WHERE producto_id = $1 AND sucursal_id = $2',
+        [item.producto_id, sucursal_id]
+      );
+      const stockRow = stockResult.rows[0];
       const disponible = stockRow?.cantidad_litros ?? 0;
 
       if (disponible < item.litros) {
         return NextResponse.json(
           {
             success: false,
-            error: `Stock insuficiente para el producto ID ${item.producto_id}. Disponible: ${disponible.toFixed(2)}L`
+            error: `Stock insuficiente para el producto ID ${item.producto_id}. Disponible: ${parseFloat(disponible).toFixed(2)}L`
           },
           { status: 400 }
         );
       }
     }
 
-    // Transacción: registrar venta, detalle y actualizar stock
-    const transaction = db.transaction(() => {
-      // Insertar venta
-      const ventaResult = db.prepare(`
-        INSERT INTO ventas (sucursal_id, cliente_id, usuario_id, total, pagado, tipo_venta)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(sucursal_id, cliente_id || null, usuario_id, total, pagado, tipo_venta || 'contado');
+    await client.query('BEGIN');
 
-      const venta_id = ventaResult.lastInsertRowid;
+    // Insertar venta
+    const ventaResult = await client.query(`
+      INSERT INTO ventas (sucursal_id, cliente_id, usuario_id, total, pagado, tipo_venta)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id
+    `, [sucursal_id, cliente_id || null, usuario_id, total, pagado, tipo_venta || 'contado']);
 
-      // Insertar detalles
-      const insertDetalle = db.prepare(`
+    const venta_id = ventaResult.rows[0].id;
+
+    for (const item of items) {
+      // Insertar detalle
+      await client.query(`
         INSERT INTO detalle_ventas (venta_id, producto_id, cantidad_litros, precio_unitario, subtotal)
-        VALUES (?, ?, ?, ?, ?)
-      `);
+        VALUES ($1, $2, $3, $4, $5)
+      `, [venta_id, item.producto_id, item.litros, item.precio_unitario, item.subtotal]);
 
-      const updateStock = db.prepare(`
+      // Actualizar stock
+      await client.query(`
         UPDATE stock
-        SET cantidad_litros = cantidad_litros - ?
-        WHERE producto_id = ? AND sucursal_id = ?
-      `);
+        SET cantidad_litros = cantidad_litros - $1
+        WHERE producto_id = $2 AND sucursal_id = $3
+      `, [item.litros, item.producto_id, sucursal_id]);
+    }
 
-      for (const item of items) {
-        insertDetalle.run(venta_id, item.producto_id, item.litros, item.precio_unitario, item.subtotal);
-        updateStock.run(item.litros, item.producto_id, sucursal_id);
-      }
+    // Si es fiado, actualizar deuda del cliente
+    if (tipo_venta === 'fiado' && cliente_id) {
+      const deuda = total - pagado;
+      await client.query('UPDATE clientes SET saldo_deuda = saldo_deuda + $1 WHERE id = $2', [deuda, cliente_id]);
+    }
 
-      // Si es fiado, actualizar deuda del cliente
-      if (tipo_venta === 'fiado' && cliente_id) {
-        const deuda = total - pagado;
-        db.prepare('UPDATE clientes SET saldo_deuda = saldo_deuda + ? WHERE id = ?').run(deuda, cliente_id);
-      }
-
-      return venta_id;
-    });
-
-    const ventaIdResult = transaction();
+    await client.query('COMMIT');
 
     return NextResponse.json({
       success: true,
-      venta_id: ventaIdResult,
+      venta_id: venta_id,
       total: total,
       mensaje: "Venta registrada correctamente"
     });
 
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('❌ Error al registrar venta:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : "Error al registrar venta"
     }, { status: 500 });
+  } finally {
+    client.release();
   }
 }
 
@@ -142,14 +105,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const sucursalId = searchParams.get('sucursal_id');
 
-    let query = `
+    let queryStr = `
       SELECT 
         v.id, v.fecha, v.total, v.tipo_venta, v.pagado,
         c.nombre as cliente_nombre,
         u.nombre as vendedor_nombre,
         s.nombre as sucursal,
         (SELECT COUNT(*) FROM detalle_ventas WHERE venta_id = v.id) as items_count,
-        (SELECT group_concat(p.nombre || ' (' || 
+        (SELECT STRING_AGG(p.nombre || ' (' || 
           CASE 
             WHEN p.tipo = 'seco' THEN CAST(dv.cantidad_litros AS INT) || 'u.' 
             ELSE dv.cantidad_litros || 'L' 
@@ -166,13 +129,14 @@ export async function GET(request: Request) {
     const params = [];
 
     if (sucursalId) {
-      query += ` WHERE v.sucursal_id = ?`;
+      queryStr += ` WHERE v.sucursal_id = $1`;
       params.push(sucursalId);
     }
 
-    query += ` ORDER BY v.fecha DESC LIMIT 50`;
+    queryStr += ` ORDER BY v.fecha DESC LIMIT 50`;
 
-    const ventas = db.prepare(query).all(...params);
+    const result = await db.query(queryStr, params);
+    const ventas = result.rows;
 
     return NextResponse.json({ success: true, ventas });
   } catch (error) {
@@ -182,52 +146,50 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const client = await db.connect();
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
     if (!id) return NextResponse.json({ success: false, error: "ID requerido" }, { status: 400 });
 
-    const transaction = db.transaction(() => {
-      const venta: any = db.prepare('SELECT * FROM ventas WHERE id = ?').get(id);
-      if (!venta) throw new Error("Venta no encontrada");
+    const ventaResult = await client.query('SELECT * FROM ventas WHERE id = $1', [id]);
+    const venta = ventaResult.rows[0];
+    if (!venta) return NextResponse.json({ success: false, error: "Venta no encontrada" }, { status: 404 });
 
-      // 1. Devolver stock
-      const items: any[] = db.prepare('SELECT * FROM detalle_ventas WHERE venta_id = ?').all(id);
-      const updateStock = db.prepare(`
+    await client.query('BEGIN');
+
+    // 1. Devolver stock
+    const itemsResult = await client.query('SELECT * FROM detalle_ventas WHERE venta_id = $1', [id]);
+    const items = itemsResult.rows;
+
+    for (const item of items) {
+      await client.query(`
         UPDATE stock
-        SET cantidad_litros = cantidad_litros + ?
-        WHERE producto_id = ? AND sucursal_id = ?
-      `);
+        SET cantidad_litros = cantidad_litros + $1
+        WHERE producto_id = $2 AND sucursal_id = $3
+      `, [item.cantidad_litros, item.producto_id, venta.sucursal_id]);
+    }
 
-      for (const item of items) {
-        updateStock.run(item.cantidad_litros, item.producto_id, venta.sucursal_id);
-      }
+    // 2. Revertir saldo cliente si fue fiado
+    if (venta.tipo_venta === 'fiado' && venta.cliente_id) {
+      const deuda = parseFloat(venta.total) - parseFloat(venta.pagado);
+      console.log(`💳 Revertiendo deuda cliente ${venta.cliente_id}: -${deuda}`);
+      await client.query('UPDATE clientes SET saldo_deuda = saldo_deuda - $1 WHERE id = $2', [deuda, venta.cliente_id]);
+    }
 
-      // 2. Revertir saldo cliente si fue fiado
-      if (venta.tipo_venta === 'fiado' && venta.cliente_id) {
-        const deuda = venta.total - venta.pagado;
-        console.log(`💳 Revertiendo deuda cliente ${venta.cliente_id}: -${deuda}`);
+    // 3. Eliminar registros
+    await client.query('DELETE FROM detalle_ventas WHERE venta_id = $1', [id]);
+    await client.query('DELETE FROM ventas WHERE id = $1', [id]);
 
-        try {
-          const result = db.prepare('UPDATE clientes SET saldo_deuda = saldo_deuda - ? WHERE id = ?').run(deuda, venta.cliente_id);
-          console.log('Update result:', result);
-        } catch (err) {
-          console.error('Error updating client debt:', err);
-          throw new Error('Error al actualizar la cuenta del cliente: ' + (err instanceof Error ? err.message : String(err)));
-        }
-      }
-
-      // 3. Eliminar registros
-      db.prepare('DELETE FROM detalle_ventas WHERE venta_id = ?').run(id);
-      db.prepare('DELETE FROM ventas WHERE id = ?').run(id);
-    });
-
-    transaction();
+    await client.query('COMMIT');
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error(error);
     return NextResponse.json({ success: false, error: "Error al eliminar venta" }, { status: 500 });
+  } finally {
+    client.release();
   }
 }

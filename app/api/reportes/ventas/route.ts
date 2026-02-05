@@ -25,39 +25,39 @@ export async function GET(request: NextRequest) {
     const params: any[] = [];
 
     if (desde && hasta) {
-      whereClause = "WHERE DATE(v.fecha) BETWEEN DATE(?) AND DATE(?)";
+      whereClause = "WHERE v.fecha::date BETWEEN $1::date AND $2::date";
       params.push(desde, hasta);
     } else {
       whereClause = `
-        WHERE strftime('%Y-%m', v.fecha) = strftime('%Y-%m', 'now', 'localtime')
+        WHERE TO_CHAR(v.fecha, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
       `;
     }
 
     // Filtro de sucursal
     if (isEncargado) {
-      whereClause += " AND v.sucursal_id = ?";
+      whereClause += ` AND v.sucursal_id = $${params.length + 1}`;
       params.push(sucursal_id);
     }
 
-    const rows: any[] = db
-      .prepare(
-        `
-        SELECT 
-          v.id,
-          v.fecha,
-          s.nombre AS sucursal,
-          COALESCE(c.nombre, '') AS cliente,
-          v.tipo_venta,
-          v.total,
-          v.pagado
-        FROM ventas v
-        JOIN sucursales s ON v.sucursal_id = s.id
-        LEFT JOIN clientes c ON v.cliente_id = c.id
-        ${whereClause}
-        ORDER BY v.fecha DESC
+    const result = await db.query(
       `
-      )
-      .all(...params);
+      SELECT 
+        v.id,
+        v.fecha,
+        s.nombre AS sucursal,
+        COALESCE(c.nombre, '') AS cliente,
+        v.tipo_venta,
+        v.total,
+        v.pagado
+      FROM ventas v
+      JOIN sucursales s ON v.sucursal_id = s.id
+      LEFT JOIN clientes c ON v.cliente_id = c.id
+      ${whereClause}
+      ORDER BY v.fecha DESC
+    `,
+      params
+    );
+    const rows = result.rows;
 
     if (formato === "excel" || formato === "csv") {
       const headers = [

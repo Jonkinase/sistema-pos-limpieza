@@ -20,21 +20,21 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    const venta: any = db
-      .prepare(
-        `
-        SELECT 
-          v.*,
-          s.nombre AS sucursal_nombre,
-          c.nombre AS cliente_nombre,
-          c.telefono AS cliente_telefono
-        FROM ventas v
-        JOIN sucursales s ON v.sucursal_id = s.id
-        LEFT JOIN clientes c ON v.cliente_id = c.id
-        WHERE v.id = ?
+    const ventaResult = await db.query(
       `
-      )
-      .get(ventaId);
+      SELECT 
+        v.*,
+        s.nombre AS sucursal_nombre,
+        c.nombre AS cliente_nombre,
+        c.telefono AS cliente_telefono
+      FROM ventas v
+      JOIN sucursales s ON v.sucursal_id = s.id
+      LEFT JOIN clientes c ON v.cliente_id = c.id
+      WHERE v.id = $1
+    `,
+      [ventaId]
+    );
+    const venta = ventaResult.rows[0];
 
     if (!venta) {
       return NextResponse.json(
@@ -43,19 +43,19 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    const items: any[] = db
-      .prepare(
-        `
-        SELECT 
-          dv.*,
-          p.nombre AS producto_nombre,
-          p.tipo AS producto_tipo
-        FROM detalle_ventas dv
-        JOIN productos p ON dv.producto_id = p.id
-        WHERE dv.venta_id = ?
+    const itemsResult = await db.query(
       `
-      )
-      .all(ventaId);
+      SELECT 
+        dv.*,
+        p.nombre AS producto_nombre,
+        p.tipo AS producto_tipo
+      FROM detalle_ventas dv
+      JOIN productos p ON dv.producto_id = p.id
+      WHERE dv.venta_id = $1
+    `,
+      [ventaId]
+    );
+    const items = itemsResult.rows;
 
     return NextResponse.json(
       {

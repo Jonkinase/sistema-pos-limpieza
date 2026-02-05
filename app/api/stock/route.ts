@@ -3,9 +3,22 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const productos = db.prepare('SELECT * FROM productos WHERE activo = 1').all();
-    const sucursales = db.prepare('SELECT * FROM sucursales WHERE activo = 1').all();
-    const stocks = db.prepare('SELECT * FROM stock').all();
+    const productosResult = await db.query('SELECT * FROM productos WHERE activo = 1');
+    const productos = productosResult.rows.map(p => ({
+      ...p,
+      precio_minorista: parseFloat(p.precio_minorista),
+      precio_mayorista: p.precio_mayorista ? parseFloat(p.precio_mayorista) : null,
+      litros_minimo_mayorista: p.litros_minimo_mayorista ? parseFloat(p.litros_minimo_mayorista) : null
+    }));
+
+    const sucursalesResult = await db.query('SELECT * FROM sucursales WHERE activo = 1');
+    const sucursales = sucursalesResult.rows;
+
+    const stocksResult = await db.query('SELECT * FROM stock');
+    const stocks = stocksResult.rows.map(s => ({
+      ...s,
+      cantidad_litros: parseFloat(s.cantidad_litros)
+    }));
 
     return NextResponse.json(
       {
@@ -52,10 +65,10 @@ export async function POST(request: Request) {
     }
 
     // Verificar existencia de producto y sucursal
-    const producto = db.prepare('SELECT id FROM productos WHERE id = ?').get(producto_id);
-    const sucursal = db.prepare('SELECT id FROM sucursales WHERE id = ?').get(sucursal_id);
+    const productoResult = await db.query('SELECT id FROM productos WHERE id = $1', [producto_id]);
+    const sucursalResult = await db.query('SELECT id FROM sucursales WHERE id = $1', [sucursal_id]);
 
-    if (!producto || !sucursal) {
+    if (productoResult.rowCount === 0 || sucursalResult.rowCount === 0) {
       return NextResponse.json(
         { success: false, error: 'Producto o sucursal no válidos' },
         { status: 400 }
@@ -63,20 +76,18 @@ export async function POST(request: Request) {
     }
 
     // Insertar o actualizar stock
-    db.prepare(
-      `
+    await db.query(`
       INSERT INTO stock (producto_id, sucursal_id, cantidad_litros)
-      VALUES (?, ?, ?)
+      VALUES ($1, $2, $3)
       ON CONFLICT(producto_id, sucursal_id)
-      DO UPDATE SET cantidad_litros = excluded.cantidad_litros
-    `
-    ).run(producto_id, sucursal_id, cantidad_litros);
+      DO UPDATE SET cantidad_litros = EXCLUDED.cantidad_litros
+    `, [producto_id, sucursal_id, cantidad_litros]);
 
-    const nuevoStock = db
-      .prepare(
-        'SELECT * FROM stock WHERE producto_id = ? AND sucursal_id = ?'
-      )
-      .get(producto_id, sucursal_id);
+    const nuevoStockResult = await db.query(
+      'SELECT * FROM stock WHERE producto_id = $1 AND sucursal_id = $2',
+      [producto_id, sucursal_id]
+    );
+    const nuevoStock = nuevoStockResult.rows[0];
 
     return NextResponse.json(
       {

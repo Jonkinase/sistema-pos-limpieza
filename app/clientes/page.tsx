@@ -308,7 +308,7 @@ export default function ClientesPage() {
                       <div className="text-right">
                         <p className={`font-bold text-lg ${cliente.saldo_deuda > 0 ? 'text-red-600' : 'text-green-600'
                           }`}>
-                          ${cliente.saldo_deuda.toFixed(2)}
+                          ${Number(cliente.saldo_deuda).toFixed(2)}
                         </p>
                         <p className="text-xs text-gray-500">
                           {cliente.saldo_deuda > 0 ? 'Debe' : 'Sin deuda'}
@@ -343,7 +343,7 @@ export default function ClientesPage() {
                     <p className="text-sm text-gray-600 mb-1">Saldo Total:</p>
                     <p className={`text-4xl font-bold ${clienteSeleccionado.saldo_deuda > 0 ? 'text-red-600' : 'text-green-600'
                       }`}>
-                      ${clienteSeleccionado.saldo_deuda.toFixed(2)}
+                      ${Number(clienteSeleccionado.saldo_deuda).toFixed(2)}
                     </p>
                   </div>
 
@@ -399,7 +399,7 @@ export default function ClientesPage() {
                         <div key={pago.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                           <div className="flex justify-between items-start">
                             <div>
-                              <p className="font-bold text-green-600">${pago.monto.toFixed(2)}</p>
+                              <p className="font-bold text-green-600">${Number(pago.monto).toFixed(2)}</p>
                               <p className="text-xs text-gray-500">
                                 {new Date(pago.fecha).toLocaleString('es-AR')}
                               </p>

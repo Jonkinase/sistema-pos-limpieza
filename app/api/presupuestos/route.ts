@@ -2,38 +2,9 @@ import db from "@/lib/db/database";
 import { NextResponse, NextRequest } from "next/server";
 import { verifyAuthToken } from "@/lib/auth";
 
-// Crear tabla de presupuestos
-db.exec(`
-  CREATE TABLE IF NOT EXISTS presupuestos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sucursal_id INTEGER NOT NULL,
-    cliente_nombre TEXT,
-    total REAL NOT NULL,
-    estado TEXT DEFAULT 'pendiente',
-    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-    venta_id INTEGER,
-    FOREIGN KEY (sucursal_id) REFERENCES sucursales(id),
-    FOREIGN KEY (venta_id) REFERENCES ventas(id)
-  )
-`);
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS detalle_presupuestos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    presupuesto_id INTEGER NOT NULL,
-    producto_id INTEGER NOT NULL,
-    producto_nombre TEXT NOT NULL,
-    cantidad_litros REAL NOT NULL,
-    precio_unitario REAL NOT NULL,
-    subtotal REAL NOT NULL,
-    tipo_precio TEXT,
-    FOREIGN KEY (presupuesto_id) REFERENCES presupuestos(id),
-    FOREIGN KEY (producto_id) REFERENCES productos(id)
-  )
-`);
-
 // Crear presupuesto
 export async function POST(request: Request) {
+  const client = await db.connect();
   try {
     const body = await request.json();
     const { sucursal_id, cliente_nombre, items } = body;
@@ -41,22 +12,23 @@ export async function POST(request: Request) {
     // Calcular total
     const total = items.reduce((sum: number, item: any) => sum + item.subtotal, 0);
 
-    // Insertar presupuesto
-    const presupuestoResult = db.prepare(`
-      INSERT INTO presupuestos (sucursal_id, cliente_nombre, total, estado)
-      VALUES (?, ?, ?, 'pendiente')
-    `).run(sucursal_id, cliente_nombre || 'Cliente sin nombre', total);
+    await client.query('BEGIN');
 
-    const presupuesto_id = presupuestoResult.lastInsertRowid;
+    // Insertar presupuesto
+    const presupuestoResult = await client.query(`
+      INSERT INTO presupuestos (sucursal_id, cliente_nombre, total, estado)
+      VALUES ($1, $2, $3, 'pendiente')
+      RETURNING id
+    `, [sucursal_id, cliente_nombre || 'Cliente sin nombre', total]);
+
+    const presupuesto_id = presupuestoResult.rows[0].id;
 
     // Insertar detalles
-    const insertDetalle = db.prepare(`
-      INSERT INTO detalle_presupuestos (presupuesto_id, producto_id, producto_nombre, cantidad_litros, precio_unitario, subtotal, tipo_precio)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
     for (const item of items) {
-      insertDetalle.run(
+      await client.query(`
+        INSERT INTO detalle_presupuestos (presupuesto_id, producto_id, producto_nombre, cantidad_litros, precio_unitario, subtotal, tipo_precio)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [
         presupuesto_id,
         item.producto_id,
         item.producto_nombre,
@@ -64,8 +36,10 @@ export async function POST(request: Request) {
         item.precio_unitario,
         item.subtotal,
         item.tipo_precio
-      );
+      ]);
     }
+
+    await client.query('COMMIT');
 
     return NextResponse.json({
       success: true,
@@ -75,10 +49,14 @@ export async function POST(request: Request) {
     });
 
   } catch (error) {
+    await client.query('ROLLBACK');
+    console.error(error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : "Error al guardar presupuesto"
     }, { status: 500 });
+  } finally {
+    client.release();
   }
 }
 
@@ -104,31 +82,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Sucursal no definida" }, { status: 400 });
     }
 
-    const query = sucursal_id
-      ? `
-        SELECT p.*, s.nombre as sucursal
-        FROM presupuestos p
-        JOIN sucursales s ON p.sucursal_id = s.id
-        WHERE p.sucursal_id = ?
-        ORDER BY p.fecha DESC
-        LIMIT 100
-      `
-      : `
-        SELECT p.*, s.nombre as sucursal
-        FROM presupuestos p
-        JOIN sucursales s ON p.sucursal_id = s.id
-        WHERE p.sucursal_id IS NULL
-        ORDER BY p.fecha DESC
-        LIMIT 100
-      `;
+    let result;
+    if (sucursal_id) {
+      result = await db.query(`
+            SELECT p.*, s.nombre as sucursal
+            FROM presupuestos p
+            JOIN sucursales s ON p.sucursal_id = s.id
+            WHERE p.sucursal_id = $1
+            ORDER BY p.fecha DESC
+            LIMIT 100
+        `, [sucursal_id]);
+    } else {
+      result = await db.query(`
+            SELECT p.*, s.nombre as sucursal
+            FROM presupuestos p
+            JOIN sucursales s ON p.sucursal_id = s.id
+            WHERE p.sucursal_id IS NULL
+            ORDER BY p.fecha DESC
+            LIMIT 100
+        `);
+    }
 
-    const presupuestos = db.prepare(query).all(sucursal_id ? [sucursal_id] : []);
+    const presupuestos = result.rows;
 
     return NextResponse.json({
       success: true,
       presupuestos
     });
   } catch (error) {
+    console.error(error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : "Error al obtener presupuestos"

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, error: "No autorizado" }, { status: 403 });
         }
 
-        let query = `
+        let queryStr = `
             SELECT u.id, u.nombre, u.email, u.rol, u.sucursal_id, s.nombre as sucursal_nombre, u.creado_en
             FROM usuarios u
             LEFT JOIN sucursales s ON u.sucursal_id = s.id
@@ -28,16 +28,18 @@ export async function GET(request: Request) {
         let params: any[] = [];
 
         if (user.rol === 'encargado') {
-            query += ` WHERE u.sucursal_id = ? AND u.rol != 'admin'`;
+            queryStr += ` WHERE u.sucursal_id = $1 AND u.rol != 'admin'`;
             params.push(user.sucursal_id);
         }
 
-        query += ` ORDER BY u.creado_en DESC`;
+        queryStr += ` ORDER BY u.creado_en DESC`;
 
-        const usuarios = db.prepare(query).all(params);
+        const result = await db.query(queryStr, params);
+        const usuarios = result.rows;
 
         return NextResponse.json({ success: true, usuarios });
     } catch (error) {
+        console.error(error);
         return NextResponse.json({ success: false, error: "Error al obtener usuarios" }, { status: 500 });
     }
 }
@@ -65,19 +67,21 @@ export async function POST(request: Request) {
         // Hash password
         const passwordHash = await bcrypt.hash(password, 10);
 
-        const result = db.prepare(`
-      INSERT INTO usuarios (nombre, email, password_hash, rol, sucursal_id)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(nombre, email, passwordHash, rol, sucursal_id || null);
+        const result = await db.query(`
+            INSERT INTO usuarios (nombre, email, password_hash, rol, sucursal_id)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING id
+        `, [nombre, email, passwordHash, rol, sucursal_id || null]);
 
         return NextResponse.json({
             success: true,
-            id: result.lastInsertRowid,
+            id: result.rows[0].id,
             message: "Usuario creado correctamente"
         });
 
     } catch (error: any) {
-        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        console.error(error);
+        if (error.code === '23505') { // PostgreSQL code for unique_violation
             return NextResponse.json({ success: false, error: "El email ya está registrado" }, { status: 400 });
         }
         return NextResponse.json({ success: false, error: "Error al crear usuario" }, { status: 500 });
@@ -98,7 +102,8 @@ export async function DELETE(request: Request) {
         if (Number(id) === user.id) return NextResponse.json({ success: false, error: "No puedes eliminar tu propio usuario" }, { status: 400 });
 
         // Verificar permisos de eliminación
-        const targetUser: any = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id);
+        const targetResult = await db.query('SELECT * FROM usuarios WHERE id = $1', [id]);
+        const targetUser = targetResult.rows[0];
         if (!targetUser) return NextResponse.json({ success: false, error: "Usuario no encontrado" }, { status: 404 });
 
         if (user.rol === 'encargado') {
@@ -106,15 +111,16 @@ export async function DELETE(request: Request) {
                 return NextResponse.json({ success: false, error: "No tienes permiso para eliminar este usuario" }, { status: 403 });
             }
         } else if (user.rol === 'admin') {
-            if (targetUser.rol === 'admin' && targetUser.id === 1) { // Proteger admin principal opcionalmente
-                // return NextResponse.json({ success: false, error: "No se puede eliminar el administrador raíz" }, { status: 400 });
+            if (targetUser.rol === 'admin' && parseInt(targetUser.id) === 1) { // Proteger admin principal
+                return NextResponse.json({ success: false, error: "No se puede eliminar el administrador raíz" }, { status: 400 });
             }
         }
 
-        db.prepare('DELETE FROM usuarios WHERE id = ?').run(id);
+        await db.query('DELETE FROM usuarios WHERE id = $1', [id]);
 
         return NextResponse.json({ success: true, message: "Usuario eliminado" });
     } catch (error) {
+        console.error(error);
         return NextResponse.json({ success: false, error: "Error al eliminar usuario" }, { status: 500 });
     }
 }

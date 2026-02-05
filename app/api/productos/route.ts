@@ -3,9 +3,22 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const productos = db.prepare('SELECT * FROM productos').all();
-    const sucursales = db.prepare('SELECT * FROM sucursales').all();
-    const stocks = db.prepare('SELECT * FROM stock').all();
+    const productosResult = await db.query('SELECT * FROM productos');
+    const productos = productosResult.rows.map(p => ({
+      ...p,
+      precio_minorista: parseFloat(p.precio_minorista),
+      precio_mayorista: p.precio_mayorista ? parseFloat(p.precio_mayorista) : null,
+      litros_minimo_mayorista: p.litros_minimo_mayorista ? parseFloat(p.litros_minimo_mayorista) : null
+    }));
+
+    const sucursalesResult = await db.query('SELECT * FROM sucursales');
+    const sucursales = sucursalesResult.rows;
+
+    const stocksResult = await db.query('SELECT * FROM stock');
+    const stocks = stocksResult.rows.map(s => ({
+      ...s,
+      cantidad_litros: parseFloat(s.cantidad_litros)
+    }));
 
     return NextResponse.json({
       success: true,
@@ -31,25 +44,25 @@ export async function POST(request: Request) {
     }
 
     const tipoProducto = tipo || 'liquido';
-    const stmtd = db.prepare(`
-      INSERT INTO productos (nombre, tipo, precio_minorista, precio_mayorista, litros_minimo_mayorista)
-      VALUES (?, ?, ?, ?, ?)
-    `);
 
     // Para productos secos, precio mayorista es igual al minorista (o 0 si no se usa) 
     // y litros minimos irrelevant, usamos defaults seguros.
     const pMayorista = tipoProducto === 'seco' ? precio_minorista : (precio_mayorista || precio_minorista);
     const lMinimos = tipoProducto === 'seco' ? 0 : (litros_minimo_mayorista || 5);
 
-    const result = stmtd.run(nombre, tipoProducto, precio_minorista, pMayorista, lMinimos);
-    const newProductId = result.lastInsertRowid;
+    const result = await db.query(`
+      INSERT INTO productos (nombre, tipo, precio_minorista, precio_mayorista, litros_minimo_mayorista)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id
+    `, [nombre, tipoProducto, precio_minorista, pMayorista, lMinimos]);
+
+    const newProductId = result.rows[0].id;
 
     // Inicializar stock en 0 para todas las sucursales existentes
-    const sucursales: any[] = db.prepare('SELECT id FROM sucursales').all();
-    const insertStock = db.prepare('INSERT INTO stock (producto_id, sucursal_id, cantidad_litros) VALUES (?, ?, 0)');
+    const sucursales = (await db.query('SELECT id FROM sucursales')).rows;
 
     for (const sucursal of sucursales) {
-      insertStock.run(newProductId, sucursal.id);
+      await db.query('INSERT INTO stock (producto_id, sucursal_id, cantidad_litros) VALUES ($1, $2, 0)', [newProductId, sucursal.id]);
     }
 
     return NextResponse.json({
@@ -80,15 +93,13 @@ export async function PUT(request: Request) {
     const pMayorista = tipoProducto === 'seco' ? precio_minorista : (precio_mayorista || precio_minorista);
     const lMinimos = tipoProducto === 'seco' ? 0 : (litros_minimo_mayorista || 5);
 
-    const stmt = db.prepare(`
+    const result = await db.query(`
       UPDATE productos 
-      SET nombre = ?, tipo = ?, precio_minorista = ?, precio_mayorista = ?, litros_minimo_mayorista = ?
-      WHERE id = ?
-    `);
+      SET nombre = $1, tipo = $2, precio_minorista = $3, precio_mayorista = $4, litros_minimo_mayorista = $5
+      WHERE id = $6
+    `, [nombre, tipoProducto, precio_minorista, pMayorista, lMinimos, id]);
 
-    const result = stmt.run(nombre, tipoProducto, precio_minorista, pMayorista, lMinimos, id);
-
-    if (result.changes === 0) {
+    if (result.rowCount === 0) {
       return NextResponse.json({ success: false, error: "Producto no encontrado" }, { status: 404 });
     }
 
@@ -107,39 +118,47 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const client = await db.connect();
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
     if (!id) return NextResponse.json({ success: false, error: "ID requerido" }, { status: 400 });
 
-    const tieneVentas = db.prepare('SELECT count(*) as count FROM detalle_ventas WHERE producto_id = ?').get(id) as { count: number };
+    const tieneVentasResult = await client.query('SELECT count(*) as count FROM detalle_ventas WHERE producto_id = $1', [id]);
+    const tieneVentas = parseInt(tieneVentasResult.rows[0].count);
 
-    if (tieneVentas.count > 0) {
+    if (tieneVentas > 0) {
       return NextResponse.json({
         success: false,
         error: "No se puede eliminar el producto porque tiene ventas asociadas. Primero elimine las ventas."
       }, { status: 400 });
     }
 
-    const transaction = db.transaction(() => {
-      // Eliminar stock asociado
-      db.prepare('DELETE FROM stock WHERE producto_id = ?').run(id);
-      // Eliminar producto
-      const result = db.prepare('DELETE FROM productos WHERE id = ?').run(id);
+    await client.query('BEGIN');
 
-      if (result.changes === 0) throw new Error("Producto no encontrado");
-    });
+    // Eliminar stock asociado
+    await client.query('DELETE FROM stock WHERE producto_id = $1', [id]);
 
-    transaction();
+    // Eliminar producto
+    const result = await client.query('DELETE FROM productos WHERE id = $1', [id]);
+
+    if (result.rowCount === 0) {
+      throw new Error("Producto no encontrado");
+    }
+
+    await client.query('COMMIT');
 
     return NextResponse.json({ success: true, message: "Producto eliminado correctamente" });
 
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error(error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : "Error al eliminar producto"
     }, { status: 500 });
+  } finally {
+    client.release();
   }
 }

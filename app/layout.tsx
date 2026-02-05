@@ -17,11 +17,6 @@ export const metadata: Metadata = {
   description: "Sistema de Punto de Venta para productos de limpieza",
 };
 
-// Inicializar base de datos solo en el servidor
-if (typeof window === 'undefined') {
-  const { initDatabase } = require("@/lib/db/database");
-  initDatabase();
-}
 
 export default function RootLayout({
   children,

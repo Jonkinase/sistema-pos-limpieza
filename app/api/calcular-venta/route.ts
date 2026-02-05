@@ -7,25 +7,30 @@ export async function POST(request: Request) {
     const { producto_id, monto_pesos } = body;
 
     // Obtener producto
-    const producto: any = db.prepare('SELECT * FROM productos WHERE id = ?').get(producto_id);
-    
+    const result = await db.query('SELECT * FROM productos WHERE id = $1', [producto_id]);
+    const producto = result.rows[0];
+
     if (!producto) {
-      return NextResponse.json({ 
-        success: false, 
-        error: "Producto no encontrado" 
+      return NextResponse.json({
+        success: false,
+        error: "Producto no encontrado"
       }, { status: 404 });
     }
 
     // Paso 1: Calcular litros con precio minorista inicial
-    let litros = monto_pesos / producto.precio_minorista;
-    let precio_final_por_litro = producto.precio_minorista;
+    const precio_minorista = parseFloat(producto.precio_minorista);
+    const precio_mayorista = parseFloat(producto.precio_mayorista);
+    const litros_minimo_mayorista = parseFloat(producto.litros_minimo_mayorista);
+
+    let litros = monto_pesos / precio_minorista;
+    let precio_final_por_litro = precio_minorista;
     let tipo_precio = 'minorista';
 
     // Paso 2: Verificar si alcanza para mayorista
-    if (litros >= producto.litros_minimo_mayorista) {
+    if (litros >= litros_minimo_mayorista) {
       // Recalcular con precio mayorista
-      litros = monto_pesos / producto.precio_mayorista;
-      precio_final_por_litro = producto.precio_mayorista;
+      litros = monto_pesos / precio_mayorista;
+      precio_final_por_litro = precio_mayorista;
       tipo_precio = 'mayorista';
     }
 
@@ -39,14 +44,15 @@ export async function POST(request: Request) {
       precio_por_litro: precio_final_por_litro,
       tipo_precio: tipo_precio,
       total: parseFloat(total.toFixed(2)),
-      ahorro: tipo_precio === 'mayorista' 
-        ? parseFloat(((producto.precio_minorista - producto.precio_mayorista) * litros).toFixed(2))
+      ahorro: tipo_precio === 'mayorista'
+        ? parseFloat(((precio_minorista - precio_mayorista) * litros).toFixed(2))
         : 0
     });
 
   } catch (error) {
-    return NextResponse.json({ 
-      success: false, 
+    console.error(error);
+    return NextResponse.json({
+      success: false,
       error: error instanceof Error ? error.message : "Error al calcular"
     }, { status: 500 });
   }

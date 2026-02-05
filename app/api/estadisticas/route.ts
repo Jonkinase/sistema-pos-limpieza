@@ -19,59 +19,65 @@ export async function GET(request: Request) {
     const sucursal_id = user.sucursal_id;
 
     // Total de ventas del día
-    const ventasHoy: any = db.prepare(`
+    const ventasHoyResult = await db.query(`
       SELECT COUNT(*) as cantidad, COALESCE(SUM(total), 0) as total
       FROM ventas
-      WHERE DATE(fecha) = DATE('now', 'localtime')
-      ${isEncargado ? 'AND sucursal_id = ?' : ''}
-    `).get(isEncargado ? [sucursal_id] : []);
+      WHERE DATE(fecha) = CURRENT_DATE
+      ${isEncargado ? 'AND sucursal_id = $1' : ''}
+    `, isEncargado ? [sucursal_id] : []);
+    const ventasHoy = ventasHoyResult.rows[0];
 
     // Total de ventas del mes
-    const ventasMes: any = db.prepare(`
+    const ventasMesResult = await db.query(`
       SELECT COUNT(*) as cantidad, COALESCE(SUM(total), 0) as total
       FROM ventas
-      WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now', 'localtime')
-      ${isEncargado ? 'AND sucursal_id = ?' : ''}
-    `).get(isEncargado ? [sucursal_id] : []);
+      WHERE TO_CHAR(fecha, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+      ${isEncargado ? 'AND sucursal_id = $1' : ''}
+    `, isEncargado ? [sucursal_id] : []);
+    const ventasMes = ventasMesResult.rows[0];
 
     // Ventas por sucursal (del mes)
     let ventasPorSucursal: any[] = [];
     if (!isEncargado) {
-      ventasPorSucursal = db.prepare(`
+      const vpsResult = await db.query(`
         SELECT s.nombre, COUNT(v.id) as cantidad, COALESCE(SUM(v.total), 0) as total
         FROM sucursales s
         LEFT JOIN ventas v ON s.id = v.sucursal_id 
-          AND strftime('%Y-%m', v.fecha) = strftime('%Y-%m', 'now', 'localtime')
+          AND TO_CHAR(v.fecha, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
         GROUP BY s.id, s.nombre
-      `).all();
+      `);
+      ventasPorSucursal = vpsResult.rows;
     }
 
     // Total de deuda pendiente
-    const deudaTotal: any = db.prepare(`
+    const deudaTotalResult = await db.query(`
       SELECT COALESCE(SUM(saldo_deuda), 0) as total
       FROM clientes
       WHERE saldo_deuda > 0
-      ${isEncargado ? 'AND sucursal_id = ?' : ''}
-    `).get(isEncargado ? [sucursal_id] : []);
+      ${isEncargado ? 'AND sucursal_id = $1' : ''}
+    `, isEncargado ? [sucursal_id] : []);
+    const deudaTotal = deudaTotalResult.rows[0];
 
     // Clientes con deuda
-    const clientesConDeuda: any = db.prepare(`
+    const clientesConDeudaResult = await db.query(`
       SELECT COUNT(*) as cantidad
       FROM clientes
       WHERE saldo_deuda > 0
-      ${isEncargado ? 'AND sucursal_id = ?' : ''}
-    `).get(isEncargado ? [sucursal_id] : []);
+      ${isEncargado ? 'AND sucursal_id = $1' : ''}
+    `, isEncargado ? [sucursal_id] : []);
+    const clientesConDeuda = clientesConDeudaResult.rows[0];
 
     // Presupuestos pendientes
-    const presupuestosPendientes: any = db.prepare(`
+    const presupuestosPendientesResult = await db.query(`
       SELECT COUNT(*) as cantidad, COALESCE(SUM(total), 0) as total
       FROM presupuestos
       WHERE estado = 'pendiente'
-      ${isEncargado ? 'AND sucursal_id = ?' : ''}
-    `).get(isEncargado ? [sucursal_id] : []);
+      ${isEncargado ? 'AND sucursal_id = $1' : ''}
+    `, isEncargado ? [sucursal_id] : []);
+    const presupuestosPendientes = presupuestosPendientesResult.rows[0];
 
     // Top 5 productos más vendidos (del mes)
-    const topProductos = db.prepare(`
+    const topProductosResult = await db.query(`
       SELECT 
         p.nombre,
         COALESCE(SUM(dv.cantidad_litros), 0) as litros_vendidos,
@@ -79,52 +85,67 @@ export async function GET(request: Request) {
       FROM productos p
       LEFT JOIN detalle_ventas dv ON p.id = dv.producto_id
       LEFT JOIN ventas v ON dv.venta_id = v.id
-        AND strftime('%Y-%m', v.fecha) = strftime('%Y-%m', 'now', 'localtime')
+        AND TO_CHAR(v.fecha, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
       WHERE 1=1
-      ${isEncargado ? 'AND v.sucursal_id = ?' : ''}
+      ${isEncargado ? 'AND v.sucursal_id = $1' : ''}
       GROUP BY p.id, p.nombre
       ORDER BY litros_vendidos DESC
       LIMIT 5
-    `).all(isEncargado ? [sucursal_id] : []);
+    `, isEncargado ? [sucursal_id] : []);
+    const topProductos = topProductosResult.rows;
 
     // Ventas contado vs fiado (del mes)
-    const ventasPorTipo = db.prepare(`
+    const ventasPorTipoResult = await db.query(`
       SELECT 
         tipo_venta,
         COUNT(*) as cantidad,
         COALESCE(SUM(total), 0) as total
       FROM ventas
-      WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now', 'localtime')
-      ${isEncargado ? 'AND sucursal_id = ?' : ''}
+      WHERE TO_CHAR(fecha, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+      ${isEncargado ? 'AND sucursal_id = $1' : ''}
       GROUP BY tipo_venta
-    `).all(isEncargado ? [sucursal_id] : []);
+    `, isEncargado ? [sucursal_id] : []);
+    const ventasPorTipo = ventasPorTipoResult.rows;
 
     return NextResponse.json({
       success: true,
       estadisticas: {
         hoy: {
-          cantidad: ventasHoy.cantidad,
-          total: ventasHoy.total
+          cantidad: parseInt(ventasHoy.cantidad),
+          total: parseFloat(ventasHoy.total)
         },
         mes: {
-          cantidad: ventasMes.cantidad,
-          total: ventasMes.total
+          cantidad: parseInt(ventasMes.cantidad),
+          total: parseFloat(ventasMes.total)
         },
-        sucursales: ventasPorSucursal,
+        sucursales: ventasPorSucursal.map(s => ({
+          ...s,
+          cantidad: parseInt(s.cantidad),
+          total: parseFloat(s.total)
+        })),
         deudas: {
-          total: deudaTotal.total,
-          clientes: clientesConDeuda.cantidad
+          total: parseFloat(deudaTotal.total),
+          clientes: parseInt(clientesConDeuda.cantidad)
         },
         presupuestos: {
-          pendientes: presupuestosPendientes.cantidad,
-          total: presupuestosPendientes.total
+          pendientes: parseInt(presupuestosPendientes.cantidad),
+          total: parseFloat(presupuestosPendientes.total)
         },
-        topProductos: topProductos,
-        ventasPorTipo: ventasPorTipo
+        topProductos: topProductos.map(p => ({
+          ...p,
+          litros_vendidos: parseFloat(p.litros_vendidos),
+          total_vendido: parseFloat(p.total_vendido)
+        })),
+        ventasPorTipo: ventasPorTipo.map(t => ({
+          ...t,
+          cantidad: parseInt(t.cantidad),
+          total: parseFloat(t.total)
+        }))
       }
     });
 
   } catch (error) {
+    console.error(error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : "Error al obtener estadísticas"

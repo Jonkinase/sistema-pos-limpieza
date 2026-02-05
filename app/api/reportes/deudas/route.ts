@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
         FROM clientes c
         WHERE c.activo = 1
           AND c.saldo_deuda > 0
-          AND c.sucursal_id = ?
+          AND c.sucursal_id = $1
         ORDER BY c.saldo_deuda DESC
       `
       : `
@@ -45,7 +45,8 @@ export async function GET(request: NextRequest) {
         ORDER BY c.saldo_deuda DESC
       `;
 
-    const rows: any[] = db.prepare(query).all(sucursal_id ? [sucursal_id] : []);
+    const result = await db.query(query, sucursal_id ? [sucursal_id] : []);
+    const rows = result.rows;
 
     const headers = ["ID", "Nombre", "Teléfono", "Saldo Deuda"];
 

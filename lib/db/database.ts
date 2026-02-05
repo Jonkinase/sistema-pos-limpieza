@@ -1,148 +1,190 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+import { Pool, types } from 'pg';
+import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 
-const dbPath = path.join(process.cwd(), 'datos-limpieza.db');
-const db = new Database(dbPath);
+// Configurar para que los tipos NUMERIC/DECIMAL se devuelvan como números, no strings
+types.setTypeParser(1700, (val) => parseFloat(val));
 
-// Habilitar foreign keys
-db.pragma('foreign_keys = ON');
+dotenv.config();
 
-// Crear tablas si no existen
-export function initDatabase() {
-  // Tabla de Sucursales
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS sucursales (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre TEXT NOT NULL,
-      direccion TEXT,
-      activo INTEGER DEFAULT 1
-    )
-  `);
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
-  // Tabla de Productos
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS productos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre TEXT NOT NULL,
-      precio_minorista REAL NOT NULL,
-      precio_mayorista REAL NOT NULL,
-      litros_minimo_mayorista REAL DEFAULT 5.0,
-      tipo TEXT DEFAULT 'liquido',
-      activo INTEGER DEFAULT 1
-    )
-  `);
+// Helper para ejecutar queries de forma asíncrona
+export const query = (text: string, params?: any[]) => pool.query(text, params);
 
-  // Tabla de Stock por Sucursal
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS stock (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      producto_id INTEGER NOT NULL,
-      sucursal_id INTEGER NOT NULL,
-      cantidad_litros REAL DEFAULT 0,
-      FOREIGN KEY (producto_id) REFERENCES productos(id),
-      FOREIGN KEY (sucursal_id) REFERENCES sucursales(id),
-      UNIQUE(producto_id, sucursal_id)
-    )
-  `);
-
-  // Tabla de Clientes
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS clientes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sucursal_id INTEGER,
-      nombre TEXT NOT NULL,
-      telefono TEXT,
-      saldo_deuda REAL DEFAULT 0,
-      activo INTEGER DEFAULT 1,
-      FOREIGN KEY (sucursal_id) REFERENCES sucursales(id)
-    )
-  `);
-
-  // Tabla de Usuarios (autenticación)
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS usuarios (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nombre TEXT NOT NULL,
-      email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      rol TEXT DEFAULT 'admin',
-      sucursal_id INTEGER,
-      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (sucursal_id) REFERENCES sucursales(id)
-    )
-  `);
-
-  // Migración: Agregar columna sucursal_id a usuarios si no existe
+// Función para inicializar la base de datos en PostgreSQL
+export async function initDatabase() {
+  const client = await pool.connect();
   try {
-    db.prepare('SELECT sucursal_id FROM usuarios LIMIT 1').get();
+    await client.query('BEGIN');
+
+    // Tabla de Sucursales
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sucursales (
+        id SERIAL PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        direccion TEXT,
+        activo INTEGER DEFAULT 1
+      )
+    `);
+
+    // Tabla de Productos
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS productos (
+        id SERIAL PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        precio_minorista DECIMAL(12, 2) NOT NULL,
+        precio_mayorista DECIMAL(12, 2) NOT NULL,
+        litros_minimo_mayorista DECIMAL(12, 2) DEFAULT 5.0,
+        tipo TEXT DEFAULT 'liquido',
+        activo INTEGER DEFAULT 1
+      )
+    `);
+
+    // Tabla de Stock por Sucursal
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS stock (
+        id SERIAL PRIMARY KEY,
+        producto_id INTEGER NOT NULL REFERENCES productos(id),
+        sucursal_id INTEGER NOT NULL REFERENCES sucursales(id),
+        cantidad_litros DECIMAL(12, 2) DEFAULT 0,
+        UNIQUE(producto_id, sucursal_id)
+      )
+    `);
+
+    // Tabla de Clientes
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS clientes (
+        id SERIAL PRIMARY KEY,
+        sucursal_id INTEGER REFERENCES sucursales(id),
+        nombre TEXT NOT NULL,
+        telefono TEXT,
+        saldo_deuda DECIMAL(12, 2) DEFAULT 0,
+        activo INTEGER DEFAULT 1
+      )
+    `);
+
+    // Tabla de Usuarios
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id SERIAL PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        rol TEXT DEFAULT 'admin',
+        sucursal_id INTEGER REFERENCES sucursales(id),
+        creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Tabla de Ventas
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ventas (
+        id SERIAL PRIMARY KEY,
+        sucursal_id INTEGER NOT NULL REFERENCES sucursales(id),
+        cliente_id INTEGER REFERENCES clientes(id),
+        usuario_id INTEGER REFERENCES usuarios(id),
+        total DECIMAL(12, 2) NOT NULL,
+        pagado DECIMAL(12, 2) NOT NULL,
+        tipo_venta TEXT DEFAULT 'contado',
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Migración para añadir usuario_id si no existe
+    try {
+      await client.query('ALTER TABLE ventas ADD COLUMN IF NOT EXISTS usuario_id INTEGER REFERENCES usuarios(id)');
+    } catch (e) {
+      // Ignorar si falla (ej. ya existe y la sintaxis IF NOT EXISTS no es soportada en versiones viejas, 
+      // aunque en PG 9.6+ funciona para columnas)
+    }
+
+    // Tabla de Detalle de Ventas
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS detalle_ventas (
+        id SERIAL PRIMARY KEY,
+        venta_id INTEGER NOT NULL REFERENCES ventas(id) ON DELETE CASCADE,
+        producto_id INTEGER NOT NULL REFERENCES productos(id),
+        cantidad_litros DECIMAL(12, 2) NOT NULL,
+        precio_unitario DECIMAL(12, 2) NOT NULL,
+        subtotal DECIMAL(12, 2) NOT NULL
+      )
+    `);
+
+    // Tabla de Pagos
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS pagos (
+        id SERIAL PRIMARY KEY,
+        cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+        monto DECIMAL(12, 2) NOT NULL,
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        observaciones TEXT
+      )
+    `);
+
+    // Tabla de Presupuestos
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS presupuestos (
+        id SERIAL PRIMARY KEY,
+        sucursal_id INTEGER NOT NULL REFERENCES sucursales(id),
+        cliente_nombre TEXT,
+        total DECIMAL(12, 2) NOT NULL,
+        estado TEXT DEFAULT 'pendiente',
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        venta_id INTEGER REFERENCES ventas(id)
+      )
+    `);
+
+    // Tabla de Detalle de Presupuestos
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS detalle_presupuestos (
+        id SERIAL PRIMARY KEY,
+        presupuesto_id INTEGER NOT NULL REFERENCES presupuestos(id) ON DELETE CASCADE,
+        producto_id INTEGER NOT NULL REFERENCES productos(id),
+        producto_nombre TEXT NOT NULL,
+        cantidad_litros DECIMAL(12, 2) NOT NULL,
+        precio_unitario DECIMAL(12, 2) NOT NULL,
+        subtotal DECIMAL(12, 2) NOT NULL,
+        tipo_precio TEXT
+      )
+    `);
+
+    // Las migraciones de columnas se pueden manejar con ALTER TABLE si es necesario, 
+    // pero para PostgreSQL es mejor tener el esquema base sólido.
+
+    // Insertar sucursales iniciales
+    const sucursalesCount = await client.query('SELECT COUNT(*) FROM sucursales');
+    if (parseInt(sucursalesCount.rows[0].count) === 0) {
+      await client.query('INSERT INTO sucursales (nombre, direccion) VALUES ($1, $2)', ['Local 1', 'Dirección Local 1']);
+      await client.query('INSERT INTO sucursales (nombre, direccion) VALUES ($1, $2)', ['Local 2', 'Dirección Local 2']);
+    }
+
+    // Insertar usuario administrador
+    const usuariosCount = await client.query('SELECT COUNT(*) FROM usuarios');
+    if (parseInt(usuariosCount.rows[0].count) === 0) {
+      const passwordHash = bcrypt.hashSync('admin123', 10);
+      await client.query(`
+        INSERT INTO usuarios (nombre, email, password_hash, rol)
+        VALUES ($1, $2, $3, $4)
+      `, ['Administrador', 'admin@sistema.com', passwordHash, 'admin']);
+    }
+
+    await client.query('COMMIT');
+    console.log('✅ Base de datos PostgreSQL inicializada correctamente');
   } catch (error) {
-    console.log('🔄 Agregando columna sucursal_id a tabla usuarios...');
-    db.exec('ALTER TABLE usuarios ADD COLUMN sucursal_id INTEGER REFERENCES sucursales(id)');
+    await client.query('ROLLBACK');
+    console.error('❌ Error inicializando base de datos:', error);
+    throw error;
+  } finally {
+    client.release();
   }
-
-  // Migración: Agregar columna tipo a productos si no existe
-  try {
-    db.prepare('SELECT tipo FROM productos LIMIT 1').get();
-  } catch (error) {
-    console.log('🔄 Agregando columna tipo a tabla productos...');
-    db.exec("ALTER TABLE productos ADD COLUMN tipo TEXT DEFAULT 'liquido'");
-  }
-
-  // Migración: Agregar columna sucursal_id a clientes si no existe
-  try {
-    db.prepare('SELECT sucursal_id FROM clientes LIMIT 1').get();
-  } catch (error) {
-    console.log('🔄 Agregando columna sucursal_id a tabla clientes...');
-    db.exec('ALTER TABLE clientes ADD COLUMN sucursal_id INTEGER REFERENCES sucursales(id)');
-
-    // Asignar clientes actuales a Local 1 (ID 1)
-    db.prepare('UPDATE clientes SET sucursal_id = 1 WHERE sucursal_id IS NULL').run();
-  }
-
-  // Insertar sucursales iniciales si no existen
-  const sucursalesCount = db.prepare('SELECT COUNT(*) as count FROM sucursales').get() as { count: number };
-
-  if (sucursalesCount.count === 0) {
-    db.prepare('INSERT INTO sucursales (nombre, direccion) VALUES (?, ?)').run('Local 1', 'Dirección Local 1');
-    db.prepare('INSERT INTO sucursales (nombre, direccion) VALUES (?, ?)').run('Local 2', 'Dirección Local 2');
-  }
-
-  // Insertar usuario administrador por defecto si no existe
-  const usuariosCount = db.prepare('SELECT COUNT(*) as count FROM usuarios').get() as { count: number };
-
-  if (usuariosCount.count === 0) {
-    const passwordHash = bcrypt.hashSync('admin123', 10);
-    db.prepare(`
-      INSERT INTO usuarios (nombre, email, password_hash, rol)
-      VALUES (?, ?, ?, ?)
-    `).run('Administrador', 'admin@sistema.com', passwordHash, 'admin');
-  }
-
-  // Insertar productos de ejemplo si no existen
-  const productosCount = db.prepare('SELECT COUNT(*) as count FROM productos').get() as { count: number };
-
-  if (productosCount.count === 0) {
-    // Cloro
-    db.prepare(`
-      INSERT INTO productos (nombre, precio_minorista, precio_mayorista, litros_minimo_mayorista)
-      VALUES (?, ?, ?, ?)
-    `).run('Cloro', 250, 200, 5);
-
-    // Jabón Líquido
-    db.prepare(`
-      INSERT INTO productos (nombre, precio_minorista, precio_mayorista, litros_minimo_mayorista)
-      VALUES (?, ?, ?, ?)
-    `).run('Jabón Líquido', 300, 250, 5);
-
-    // Lavandina
-    db.prepare(`
-      INSERT INTO productos (nombre, precio_minorista, precio_mayorista, litros_minimo_mayorista)
-      VALUES (?, ?, ?, ?)
-    `).run('Lavandina', 200, 170, 5);
-  }
-
-  console.log('✅ Base de datos inicializada correctamente');
 }
 
-export default db;
+// Inicializar base de datos
+initDatabase().catch(err => {
+  console.error('Failed to initialize database:', err);
+});
+
+export default pool;

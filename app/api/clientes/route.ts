@@ -24,11 +24,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Sucursal no definida" }, { status: 400 });
     }
 
-    const query = sucursal_id
-      ? `SELECT * FROM clientes WHERE activo = 1 AND sucursal_id = ? ORDER BY nombre`
-      : `SELECT * FROM clientes WHERE activo = 1 AND sucursal_id IS NULL ORDER BY nombre`;
+    let result;
+    if (sucursal_id) {
+      result = await db.query(
+        `SELECT * FROM clientes WHERE activo = 1 AND sucursal_id = $1 ORDER BY nombre`,
+        [sucursal_id]
+      );
+    } else {
+      result = await db.query(
+        `SELECT * FROM clientes WHERE activo = 1 AND sucursal_id IS NULL ORDER BY nombre`
+      );
+    }
 
-    const clientes = db.prepare(query).all(sucursal_id ? [sucursal_id] : []);
+    const clientes = result.rows.map(c => ({
+      ...c,
+      saldo_deuda: parseFloat(c.saldo_deuda)
+    }));
 
     return NextResponse.json({
       success: true,
@@ -67,14 +78,15 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const result = db.prepare(`
+    const result = await db.query(`
       INSERT INTO clientes (nombre, telefono, saldo_deuda, sucursal_id)
-      VALUES (?, ?, 0, ?)
-    `).run(nombre, telefono || null, sucursal_id);
+      VALUES ($1, $2, 0, $3)
+      RETURNING id
+    `, [nombre, telefono || null, sucursal_id]);
 
     return NextResponse.json({
       success: true,
-      cliente_id: result.lastInsertRowid,
+      cliente_id: result.rows[0].id,
       mensaje: "Cliente creado correctamente"
     });
 

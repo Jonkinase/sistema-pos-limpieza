@@ -415,7 +415,7 @@ export default function InventarioPage() {
                           {producto.tipo || 'Líquido'}
                         </td>
                         <td className="px-4 py-2 text-sm text-right border-b font-bold text-emerald-700">
-                          {producto.tipo === 'seco' ? Math.floor(actual) : actual.toFixed(2)}
+                          {producto.tipo === 'seco' ? Math.floor(Number(actual)) : Number(actual).toFixed(2)}
                           <span className="text-gray-400 text-xs ml-1 font-normal">
                             {producto.tipo === 'seco' ? 'u.' : 'L'}
                           </span>
