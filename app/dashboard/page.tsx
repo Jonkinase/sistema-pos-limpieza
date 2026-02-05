@@ -19,6 +19,7 @@ export default function DashboardPage() {
   const [cargando, setCargando] = useState(true);
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
+  const [user, setUser] = useState<any>(null);
 
   const router = useRouter(); // Import useRouter
 
@@ -27,8 +28,10 @@ export default function DashboardPage() {
     fetch('/api/auth/me')
       .then(res => res.json())
       .then(data => {
-        if (!data.success || data.user.rol !== 'admin') {
+        if (!data.success || (data.user.rol !== 'admin' && data.user.rol !== 'encargado')) {
           router.push('/');
+        } else {
+          setUser(data.user);
         }
       })
       .catch(() => router.push('/'));
@@ -138,34 +141,35 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-          {/* Ventas por Sucursal */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-              🏪 Ventas por Sucursal (Mes)
-            </h2>
-            <div className="space-y-3">
-              {stats.sucursales.map((sucursal, index) => (
-                <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-bold text-gray-800">{sucursal.nombre}</span>
-                    <span className="text-2xl font-bold text-indigo-600">
-                      ${sucursal.total.toFixed(2)}
-                    </span>
+          {user?.rol === 'admin' && (
+            /* Ventas por Sucursal */
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                🏪 Ventas por Sucursal (Mes)
+              </h2>
+              <div className="space-y-3">
+                {stats.sucursales.map((sucursal, index) => (
+                  <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-bold text-gray-800">{sucursal.nombre}</span>
+                      <span className="text-2xl font-bold text-indigo-600">
+                        ${sucursal.total.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-indigo-600 h-2 rounded-full"
+                        style={{
+                          width: `${stats.mes.total > 0 ? (sucursal.total / stats.mes.total) * 100 : 0}%`
+                        }}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{sucursal.cantidad} ventas</p>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-indigo-600 h-2 rounded-full"
-                      style={{
-                        width: `${stats.mes.total > 0 ? (sucursal.total / stats.mes.total) * 100 : 0}%`
-                      }}
-                    ></div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">{sucursal.cantidad} ventas</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Top Productos */}
           <div className="bg-white rounded-2xl shadow-lg p-6">

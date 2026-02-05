@@ -11,53 +11,64 @@ export async function GET(request: Request) {
     if (!token) return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
 
     const user = verifyAuthToken(token);
-    if (!user || user.rol !== 'admin') {
+    if (!user || (user.rol !== 'admin' && user.rol !== 'encargado')) {
       return NextResponse.json({ success: false, error: "Acceso denegado" }, { status: 403 });
     }
+
+    const isEncargado = user.rol === 'encargado';
+    const sucursal_id = user.sucursal_id;
 
     // Total de ventas del día
     const ventasHoy: any = db.prepare(`
       SELECT COUNT(*) as cantidad, COALESCE(SUM(total), 0) as total
       FROM ventas
       WHERE DATE(fecha) = DATE('now', 'localtime')
-    `).get();
+      ${isEncargado ? 'AND sucursal_id = ?' : ''}
+    `).get(isEncargado ? [sucursal_id] : []);
 
     // Total de ventas del mes
     const ventasMes: any = db.prepare(`
       SELECT COUNT(*) as cantidad, COALESCE(SUM(total), 0) as total
       FROM ventas
       WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now', 'localtime')
-    `).get();
+      ${isEncargado ? 'AND sucursal_id = ?' : ''}
+    `).get(isEncargado ? [sucursal_id] : []);
 
     // Ventas por sucursal (del mes)
-    const ventasPorSucursal = db.prepare(`
-      SELECT s.nombre, COUNT(v.id) as cantidad, COALESCE(SUM(v.total), 0) as total
-      FROM sucursales s
-      LEFT JOIN ventas v ON s.id = v.sucursal_id 
-        AND strftime('%Y-%m', v.fecha) = strftime('%Y-%m', 'now', 'localtime')
-      GROUP BY s.id, s.nombre
-    `).all();
+    let ventasPorSucursal: any[] = [];
+    if (!isEncargado) {
+      ventasPorSucursal = db.prepare(`
+        SELECT s.nombre, COUNT(v.id) as cantidad, COALESCE(SUM(v.total), 0) as total
+        FROM sucursales s
+        LEFT JOIN ventas v ON s.id = v.sucursal_id 
+          AND strftime('%Y-%m', v.fecha) = strftime('%Y-%m', 'now', 'localtime')
+        GROUP BY s.id, s.nombre
+      `).all();
+    }
 
     // Total de deuda pendiente
     const deudaTotal: any = db.prepare(`
       SELECT COALESCE(SUM(saldo_deuda), 0) as total
       FROM clientes
       WHERE saldo_deuda > 0
-    `).get();
+      ${isEncargado ? 'AND sucursal_id = ?' : ''}
+    `).get(isEncargado ? [sucursal_id] : []);
 
     // Clientes con deuda
     const clientesConDeuda: any = db.prepare(`
       SELECT COUNT(*) as cantidad
       FROM clientes
       WHERE saldo_deuda > 0
-    `).get();
+      ${isEncargado ? 'AND sucursal_id = ?' : ''}
+    `).get(isEncargado ? [sucursal_id] : []);
 
     // Presupuestos pendientes
     const presupuestosPendientes: any = db.prepare(`
       SELECT COUNT(*) as cantidad, COALESCE(SUM(total), 0) as total
       FROM presupuestos
       WHERE estado = 'pendiente'
-    `).get();
+      ${isEncargado ? 'AND sucursal_id = ?' : ''}
+    `).get(isEncargado ? [sucursal_id] : []);
 
     // Top 5 productos más vendidos (del mes)
     const topProductos = db.prepare(`
@@ -69,10 +80,12 @@ export async function GET(request: Request) {
       LEFT JOIN detalle_ventas dv ON p.id = dv.producto_id
       LEFT JOIN ventas v ON dv.venta_id = v.id
         AND strftime('%Y-%m', v.fecha) = strftime('%Y-%m', 'now', 'localtime')
+      WHERE 1=1
+      ${isEncargado ? 'AND v.sucursal_id = ?' : ''}
       GROUP BY p.id, p.nombre
       ORDER BY litros_vendidos DESC
       LIMIT 5
-    `).all();
+    `).all(isEncargado ? [sucursal_id] : []);
 
     // Ventas contado vs fiado (del mes)
     const ventasPorTipo = db.prepare(`
@@ -82,8 +95,9 @@ export async function GET(request: Request) {
         COALESCE(SUM(total), 0) as total
       FROM ventas
       WHERE strftime('%Y-%m', fecha) = strftime('%Y-%m', 'now', 'localtime')
+      ${isEncargado ? 'AND sucursal_id = ?' : ''}
       GROUP BY tipo_venta
-    `).all();
+    `).all(isEncargado ? [sucursal_id] : []);
 
     return NextResponse.json({
       success: true,

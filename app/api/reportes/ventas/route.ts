@@ -1,11 +1,24 @@
 import db from "@/lib/db/database";
+import { verifyAuthToken } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    const token = request.cookies.get('auth_token')?.value;
+    const user = token ? verifyAuthToken(token) : null;
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const desde = searchParams.get("desde") || "";
     const hasta = searchParams.get("hasta") || "";
     const formato = (searchParams.get("formato") || "excel").toLowerCase();
+
+    // Si es encargado, forzar su sucursal_id
+    const isEncargado = user.rol === "encargado";
+    const sucursal_id = user.sucursal_id;
 
     // Rango de fechas: por defecto, mes actual
     let whereClause = "";
@@ -18,6 +31,12 @@ export async function GET(request: Request) {
       whereClause = `
         WHERE strftime('%Y-%m', v.fecha) = strftime('%Y-%m', 'now', 'localtime')
       `;
+    }
+
+    // Filtro de sucursal
+    if (isEncargado) {
+      whereClause += " AND v.sucursal_id = ?";
+      params.push(sucursal_id);
     }
 
     const rows: any[] = db

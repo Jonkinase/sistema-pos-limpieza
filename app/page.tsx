@@ -347,7 +347,7 @@ export default function PuntoDeVenta() {
                 🧼 Punto de Venta
               </h1>
               <div className="flex gap-2 flex-wrap">
-                {user?.rol === 'admin' && (
+                {(user?.rol === 'admin' || user?.rol === 'encargado') && (
                   <Link
                     href="/dashboard"
                     className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-1.5 px-4 rounded-lg text-sm"
