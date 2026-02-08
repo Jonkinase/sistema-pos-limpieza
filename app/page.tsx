@@ -40,7 +40,7 @@ export default function PuntoDeVenta() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [stocks, setStocks] = useState<Stock[]>([]);
-  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number>(1);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null);
   const [productoSeleccionado, setProductoSeleccionado] = useState<number>(0);
   const [busquedaProducto, setBusquedaProducto] = useState<string>('');
   const [montoPesos, setMontoPesos] = useState<string>('');
@@ -104,6 +104,10 @@ export default function PuntoDeVenta() {
         setProductos(data.productos || []);
         setSucursales(data.sucursales || []);
         setStocks(data.stocks || []);
+        // Only set default sucursal if none is set (e.g. for admin)
+        if (data.sucursales && data.sucursales.length > 0) {
+          setSucursalSeleccionada(prev => prev ?? data.sucursales[0].id);
+        }
       });
   }, [salesRefreshTrigger]);
 
@@ -394,10 +398,11 @@ export default function PuntoDeVenta() {
                 <span className="text-gray-500">📍</span>
                 <select
                   className={`bg-gray-100 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-blue-500 text-gray-900 ${user?.rol !== 'admin' ? 'opacity-70 pointer-events-none bg-gray-200' : ''}`}
-                  value={sucursalSeleccionada}
+                  value={sucursalSeleccionada ?? ''}
                   onChange={(e) => setSucursalSeleccionada(Number(e.target.value))}
-                  disabled={user?.rol !== 'admin'}
+                  disabled={user?.rol !== 'admin' || sucursalSeleccionada === null}
                 >
+                  {sucursalSeleccionada === null && <option value="">Cargando...</option>}
                   {sucursales.map(s => (
                     <option key={s.id} value={s.id}>{s.nombre}</option>
                   ))}
@@ -558,11 +563,13 @@ export default function PuntoDeVenta() {
         </div>
 
         {/* Tabla de Ventas */}
-        <SalesTable
-          sucursalId={sucursalSeleccionada}
-          refreshTrigger={salesRefreshTrigger}
-          userRole={user?.rol}
-        />
+        {sucursalSeleccionada !== null && (
+          <SalesTable
+            sucursalId={sucursalSeleccionada}
+            refreshTrigger={salesRefreshTrigger}
+            userRole={user?.rol}
+          />
+        )}
       </div>
 
       {/* Modal de Agregar Producto */}
