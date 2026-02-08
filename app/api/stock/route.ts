@@ -1,5 +1,6 @@
 import db from "@/lib/db/database";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getUserFromRequest } from "@/lib/auth";
 
 export async function GET() {
   try {
@@ -28,7 +29,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { producto_id, sucursal_id, cantidad_litros } = body as {
@@ -41,6 +42,15 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, error: 'producto_id, sucursal_id y cantidad_litros son obligatorios' },
         { status: 400 }
+      );
+    }
+
+    // Validación de permisos para encargado
+    const user = getUserFromRequest(request);
+    if (user?.rol === 'encargado' && user.sucursal_id !== sucursal_id) {
+      return NextResponse.json(
+        { success: false, error: 'No tienes permiso para modificar el stock de otra sucursal' },
+        { status: 403 }
       );
     }
 
@@ -96,4 +106,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

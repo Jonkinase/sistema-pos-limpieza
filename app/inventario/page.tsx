@@ -86,7 +86,7 @@ export default function InventarioPage() {
           setSucursales(data.sucursales || []);
           setStocks(data.stocks || []);
           if (data.sucursales && data.sucursales.length > 0) {
-            setSucursalSeleccionada(data.sucursales[0].id);
+            setSucursalSeleccionada(prev => prev ?? data.sucursales[0].id);
           }
         }
       });
