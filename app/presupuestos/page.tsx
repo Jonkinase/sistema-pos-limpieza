@@ -98,7 +98,7 @@ export default function PresupuestosPage() {
 
       // 1. Agregar Banner de Cabecera
       const bannerWidth = 210; // Ancho A4
-      const bannerHeight = 70; // Ajustado según la proporción de la imagen proporcionada
+      const bannerHeight = 45; // Reducido para ajustarse mejor al banner (era 70)
 
       try {
         // En Next.js client side, podemos usar la ruta directa de public
@@ -119,7 +119,7 @@ export default function PresupuestosPage() {
       doc.setTextColor(colorTexto[0], colorTexto[1], colorTexto[2]);
       doc.setFontSize(10);
 
-      let y = bannerHeight + 15; // Empezar debajo del banner
+      let y = bannerHeight + 10; // Empezar un poco más cerca del banner (era 15)
       doc.text(`Presupuesto N: ${presupuesto.id}`, 20, y);
 
       y += 7;
