@@ -96,23 +96,30 @@ export default function PresupuestosPage() {
       const colorPrimario = [41, 128, 185]; // Azul
       const colorTexto = [44, 62, 80];
 
-      // Header con color
-      doc.setFillColor(colorPrimario[0], colorPrimario[1], colorPrimario[2]);
-      doc.rect(0, 0, 210, 40, 'F');
+      // 1. Agregar Banner de Cabecera
+      const bannerWidth = 210; // Ancho A4
+      const bannerHeight = 45; // Altura optimizada para el banner
 
-      // Título
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
-      doc.text('PRESUPUESTO', 105, 20, { align: 'center' });
-
-      doc.setFontSize(12);
-      doc.text('Sistema de Limpieza', 105, 30, { align: 'center' });
+      try {
+        // En Next.js client side, podemos usar la ruta directa de public
+        doc.addImage('/banner-presupuesto.png', 'PNG', 0, 0, bannerWidth, bannerHeight);
+      } catch (e) {
+        console.error('⚠️ No se pudo cargar el banner en el PDF:', e);
+        // Fallback al header anterior si falla la imagen
+        doc.setFillColor(colorPrimario[0], colorPrimario[1], colorPrimario[2]);
+        doc.rect(0, 0, 210, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(24);
+        doc.text('PRESUPUESTO', 105, 20, { align: 'center' });
+        doc.setFontSize(12);
+        doc.text('Sistema de Limpieza', 105, 30, { align: 'center' });
+      }
 
       // Información del presupuesto
       doc.setTextColor(colorTexto[0], colorTexto[1], colorTexto[2]);
       doc.setFontSize(10);
 
-      let y = 50;
+      let y = bannerHeight + 10; // Empezar debajo del banner
       doc.text(`Presupuesto N: ${presupuesto.id}`, 20, y);
 
       y += 7;
