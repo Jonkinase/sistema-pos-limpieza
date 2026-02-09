@@ -18,10 +18,12 @@ type Venta = {
 interface SalesTableProps {
     sucursalId: number;
     refreshTrigger: number;
-    userRole?: string; // Nuevo prop
+    userRole?: string;
+    onDeleteSuccess?: () => void;
+    onEdit?: (venta: Venta) => void; // Nueva prop
 }
 
-export default function SalesTable({ sucursalId, refreshTrigger, userRole }: SalesTableProps) {
+export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDeleteSuccess, onEdit }: SalesTableProps) {
     const [ventas, setVentas] = useState<Venta[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedSale, setSelectedSale] = useState<Venta | null>(null);
@@ -55,6 +57,10 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole }: Sal
                 alert('✅ Venta eliminada correctamente');
                 // Recargar ventas
                 setVentas(prev => prev.filter(v => v.id !== venta.id));
+                // Avisar al padre para recargar stocks
+                if (onDeleteSuccess) {
+                    onDeleteSuccess();
+                }
             } else {
                 alert('❌ Error: ' + data.error);
             }
@@ -128,8 +134,18 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole }: Sal
                                             👁️ Ver
                                         </button>
 
-                                        {/* Solo mostrar eliminar si es admin */}
-                                        {userRole === 'admin' && (
+                                        {/* Botón Editar - Solo para admin y encargado */}
+                                        {onEdit && (userRole === 'admin' || userRole === 'encargado') && (
+                                            <button
+                                                onClick={() => onEdit(venta)}
+                                                className="text-orange-500 hover:text-orange-700 font-medium text-xs px-2 py-1 bg-orange-50 rounded hover:bg-orange-100 transition"
+                                            >
+                                                ✏️ Editar
+                                            </button>
+                                        )}
+
+                                        {/* Solo mostrar eliminar si es admin o encargado */}
+                                        {(userRole === 'admin' || userRole === 'encargado') && (
                                             <button
                                                 onClick={() => handleDelete(venta)}
                                                 className="text-red-500 hover:text-red-700 font-medium text-xs px-2 py-1 bg-red-50 rounded hover:bg-red-100 transition"

@@ -133,7 +133,7 @@ export async function initDatabase() {
         total DECIMAL(12, 2) NOT NULL,
         estado TEXT DEFAULT 'pendiente',
         fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        venta_id INTEGER REFERENCES ventas(id)
+        venta_id INTEGER REFERENCES ventas(id) ON DELETE SET NULL
       )
     `);
 
@@ -153,6 +153,14 @@ export async function initDatabase() {
 
     // Las migraciones de columnas se pueden manejar con ALTER TABLE si es necesario, 
     // pero para PostgreSQL es mejor tener el esquema base sólido.
+
+    // Migración para presupuestos: asegurar ON DELETE SET NULL en venta_id
+    try {
+      await client.query('ALTER TABLE presupuestos DROP CONSTRAINT IF EXISTS presupuestos_venta_id_fkey');
+      await client.query('ALTER TABLE presupuestos ADD CONSTRAINT presupuestos_venta_id_fkey FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE SET NULL');
+    } catch (e) {
+      console.log('⚠️ Nota: No se pudo actualizar la constraint de presupuestos (puede que ya esté bien o la tabla no exista aún)');
+    }
 
     // Insertar sucursales iniciales
     const sucursalesCount = await client.query('SELECT COUNT(*) FROM sucursales');

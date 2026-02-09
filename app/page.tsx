@@ -52,6 +52,7 @@ export default function PuntoDeVenta() {
   const [modoCalculo, setModoCalculo] = useState<'pesos' | 'litros'>('pesos');
   const [salesRefreshTrigger, setSalesRefreshTrigger] = useState(0);
   const [user, setUser] = useState<any>(null); // State for current user
+  const [idVentaEditando, setIdVentaEditando] = useState<number | null>(null);
 
   // Cerrar sesión
   const cerrarSesion = async () => {
@@ -236,6 +237,45 @@ export default function PuntoDeVenta() {
     cerrarModal();
   };
 
+  // Cargar venta para editar
+  const handleEditSale = async (venta: any) => {
+    if (carrito.length > 0) {
+      if (!confirm('¿Deseas descartar el carrito actual para editar esta venta?')) return;
+    }
+
+    try {
+      const res = await fetch(`/api/ventas/${venta.id}`);
+      const data = await res.json();
+
+      if (data.success) {
+        const { venta: ventaData, items } = data;
+
+        // Cargar ítems al carrito con el formato correcto
+        const itemsEdit: ItemCarrito[] = items.map((item: any) => ({
+          producto_id: item.producto_id,
+          producto_nombre: item.producto_nombre,
+          litros: parseFloat(item.cantidad_litros),
+          precio_unitario: parseFloat(item.precio_unitario),
+          subtotal: parseFloat(item.subtotal),
+          tipo_precio: item.producto_tipo === 'seco' ? 'Unidad' : (
+            parseFloat(item.cantidad_litros) >= items.find((i: any) => i.id === item.id)?.litros_minimo_mayorista ? 'Mayorista' : 'Minorista'
+          )
+        }));
+
+        setCarrito(itemsEdit);
+        setSucursalSeleccionada(ventaData.sucursal_id);
+        setIdVentaEditando(ventaData.id);
+
+        // Scroll al carrito
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        alert('Error al cargar venta: ' + data.error);
+      }
+    } catch (error) {
+      alert('Error al intentar editar la venta');
+    }
+  };
+
   // Guardar presupuesto
   const guardarPresupuesto = async () => {
     if (carrito.length === 0) {
@@ -302,6 +342,16 @@ export default function PuntoDeVenta() {
     }
 
     try {
+      // Si estamos editando, primero eliminamos la venta anterior
+      if (idVentaEditando) {
+        console.log(`♻️ Editando venta: Eliminando venta original #${idVentaEditando}`);
+        const delRes = await fetch(`/api/ventas?id=${idVentaEditando}`, { method: 'DELETE' });
+        const delData = await delRes.json();
+        if (!delData.success) {
+          throw new Error('No se pudo revertir la venta original: ' + delData.error);
+        }
+      }
+
       const res = await fetch('/api/ventas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -326,6 +376,7 @@ export default function PuntoDeVenta() {
           window.open(`/ticket/${data.venta_id}`, '_blank');
         }
         setCarrito([]);
+        setIdVentaEditando(null); // Reset edit mode
         setSalesRefreshTrigger(prev => prev + 1); // Refresh sales table and stock
       } else {
         alert('Error: ' + data.error);
@@ -500,6 +551,24 @@ export default function PuntoDeVenta() {
               🛒 Carrito de Venta
             </h2>
 
+            {idVentaEditando && (
+              <div className="mb-4 p-3 bg-orange-100 border-l-4 border-orange-500 text-orange-800 flex justify-between items-center rounded-r-lg">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">✏️</span>
+                  <div>
+                    <p className="font-bold text-sm">Modo Edición: Venta #{idVentaEditando}</p>
+                    <p className="text-xs">Los cambios reemplazarán la venta original.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setIdVentaEditando(null); setCarrito([]); }}
+                  className="text-xs bg-orange-200 hover:bg-orange-300 text-orange-900 px-2 py-1 rounded font-bold transition"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
+
             {carrito.length === 0 ? (
               <p className="text-gray-500 text-center py-8">
                 El carrito está vacío
@@ -568,6 +637,8 @@ export default function PuntoDeVenta() {
             sucursalId={sucursalSeleccionada}
             refreshTrigger={salesRefreshTrigger}
             userRole={user?.rol}
+            onDeleteSuccess={() => setSalesRefreshTrigger(prev => prev + 1)}
+            onEdit={handleEditSale}
           />
         )}
       </div>

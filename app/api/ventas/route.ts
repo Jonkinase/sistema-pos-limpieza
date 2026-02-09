@@ -175,7 +175,7 @@ export async function DELETE(request: Request) {
     if (venta.tipo_venta === 'fiado' && venta.cliente_id) {
       const deuda = parseFloat(venta.total) - parseFloat(venta.pagado);
       console.log(`💳 Revertiendo deuda cliente ${venta.cliente_id}: -${deuda}`);
-      await client.query('UPDATE clientes SET saldo_deuda = saldo_deuda - $1 WHERE id = $2', [deuda, venta.cliente_id]);
+      await client.query('UPDATE clientes SET saldo_deuda = GREATEST(0, saldo_deuda - $1) WHERE id = $2', [deuda, venta.cliente_id]);
     }
 
     // 3. Eliminar registros
@@ -188,7 +188,7 @@ export async function DELETE(request: Request) {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error(error);
-    return NextResponse.json({ success: false, error: "Error al eliminar venta" }, { status: 500 });
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Error al eliminar venta" }, { status: 500 });
   } finally {
     client.release();
   }
