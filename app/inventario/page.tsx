@@ -190,7 +190,7 @@ export default function InventarioPage() {
       precio_minorista: '',
       precio_mayorista: '',
       litros_minimo_mayorista: '5',
-      stock_actual: ''
+      stock_actual: '0'
     });
     setModalCrearAbierto(true);
   };
@@ -226,7 +226,9 @@ export default function InventarioPage() {
           tipo: formProducto.tipo,
           precio_minorista: parseFloat(formProducto.precio_minorista),
           precio_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : null,
-          litros_minimo_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.litros_minimo_mayorista) : null
+          litros_minimo_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.litros_minimo_mayorista) : null,
+          stock_inicial: parseFloat(formProducto.stock_actual || '0'),
+          sucursal_id: sucursalSeleccionada
         })
       });
 
@@ -590,26 +592,24 @@ export default function InventarioPage() {
                   />
                 </div>
 
-                {/* Stock solo en modo editar */}
-                {modalEditarAbierto && (
-                  <div className="bg-gray-100 p-3 rounded-lg border border-gray-300">
-                    <label className="block text-sm font-bold text-gray-700">
-                      Stock Actual ({sucursales.find(s => s.id === sucursalSeleccionada)?.nombre})
-                    </label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <input
-                        type="number"
-                        step={formProducto.tipo === 'seco' ? "1" : "0.01"}
-                        className="w-full p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-lg font-bold text-right text-gray-900"
-                        value={formProducto.stock_actual}
-                        onChange={e => setFormProducto({ ...formProducto, stock_actual: e.target.value })}
-                      />
-                      <span className="text-gray-500 font-bold">
-                        {formProducto.tipo === 'seco' ? 'u.' : 'L'}
-                      </span>
-                    </div>
+                {/* Stock en modo crear y editar */}
+                <div className="bg-gray-100 p-3 rounded-lg border border-gray-300">
+                  <label className="block text-sm font-bold text-gray-700">
+                    Stock {modalEditarAbierto ? 'Actual' : 'Inicial'} ({sucursales.find(s => s.id === sucursalSeleccionada)?.nombre})
+                  </label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="number"
+                      step={formProducto.tipo === 'seco' ? "1" : "0.01"}
+                      className="w-full p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-lg font-bold text-right text-gray-900"
+                      value={formProducto.stock_actual}
+                      onChange={e => setFormProducto({ ...formProducto, stock_actual: e.target.value })}
+                    />
+                    <span className="text-gray-500 font-bold">
+                      {formProducto.tipo === 'seco' ? 'u.' : 'L'}
+                    </span>
                   </div>
-                )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>

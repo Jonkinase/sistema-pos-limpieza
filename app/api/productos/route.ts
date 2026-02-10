@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const productosResult = await db.query('SELECT * FROM productos');
+    const productosResult = await db.query('SELECT * FROM productos WHERE activo = 1');
     const productos = productosResult.rows.map(p => ({
       ...p,
       precio_minorista: parseFloat(p.precio_minorista),
@@ -37,7 +37,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { nombre, tipo, precio_minorista, precio_mayorista, litros_minimo_mayorista } = body;
+    const { nombre, tipo, precio_minorista, precio_mayorista, litros_minimo_mayorista, stock_inicial, sucursal_id } = body;
 
     if (!nombre || !precio_minorista) {
       return NextResponse.json({ success: false, error: "Nombre y precio son obligatorios" }, { status: 400 });
@@ -62,7 +62,8 @@ export async function POST(request: Request) {
     const sucursales = (await db.query('SELECT id FROM sucursales')).rows;
 
     for (const sucursal of sucursales) {
-      await db.query('INSERT INTO stock (producto_id, sucursal_id, cantidad_litros) VALUES ($1, $2, 0)', [newProductId, sucursal.id]);
+      const cantidad = (stock_inicial && sucursal_id === sucursal.id) ? parseFloat(stock_inicial) : 0;
+      await db.query('INSERT INTO stock (producto_id, sucursal_id, cantidad_litros) VALUES ($1, $2, $3)', [newProductId, sucursal.id, cantidad]);
     }
 
     return NextResponse.json({
@@ -125,23 +126,10 @@ export async function DELETE(request: Request) {
 
     if (!id) return NextResponse.json({ success: false, error: "ID requerido" }, { status: 400 });
 
-    const tieneVentasResult = await client.query('SELECT count(*) as count FROM detalle_ventas WHERE producto_id = $1', [id]);
-    const tieneVentas = parseInt(tieneVentasResult.rows[0].count);
-
-    if (tieneVentas > 0) {
-      return NextResponse.json({
-        success: false,
-        error: "No se puede eliminar el producto porque tiene ventas asociadas. Primero elimine las ventas."
-      }, { status: 400 });
-    }
-
     await client.query('BEGIN');
 
-    // Eliminar stock asociado
-    await client.query('DELETE FROM stock WHERE producto_id = $1', [id]);
-
-    // Eliminar producto
-    const result = await client.query('DELETE FROM productos WHERE id = $1', [id]);
+    // Marcar como inactivo (Soft Delete)
+    const result = await client.query('UPDATE productos SET activo = 0 WHERE id = $1', [id]);
 
     if (result.rowCount === 0) {
       throw new Error("Producto no encontrado");
