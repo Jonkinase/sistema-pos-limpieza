@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import jsPDF from 'jspdf';
+import { useRouter } from 'next/navigation';
 
 type Presupuesto = {
   id: number;
@@ -20,6 +21,7 @@ type Sucursal = {
 };
 
 export default function PresupuestosPage() {
+  const router = useRouter();
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [user, setUser] = useState<any>(null);
@@ -214,63 +216,29 @@ export default function PresupuestosPage() {
     }
   };
 
-  const convertirAVenta = async (presupuesto_id: number) => {
+  const eliminarPresupuesto = async (presupuesto_id: number) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar este presupuesto?')) return;
+
     try {
-      console.log('🔄 Convirtiendo presupuesto:', presupuesto_id);
-
-      const confirmar = confirm('¿Convertir este presupuesto a venta?\n\n¿Es venta al CONTADO?\n\nOK = Contado\nCancelar = Fiado');
-
-      let cliente_id = null;
-
-      if (!confirmar) {
-        const clienteNombre = prompt('Ingresa el nombre del cliente:');
-        if (!clienteNombre) return;
-
-        const presupuesto = presupuestos.find(p => p.id === presupuesto_id);
-        if (!presupuesto) return;
-
-        const resClientes = await fetch(`/api/clientes?sucursal_id=${presupuesto.sucursal_id}`);
-        const dataClientes = await resClientes.json();
-
-        console.log('👥 Clientes disponibles:', dataClientes);
-
-        const cliente = dataClientes.clientes.find((c: any) =>
-          c.nombre.toLowerCase().includes(clienteNombre.toLowerCase())
-        );
-
-        if (!cliente) {
-          alert('Cliente no encontrado. Créalo primero en Cuentas Corrientes.');
-          return;
-        }
-
-        cliente_id = cliente.id;
-        console.log('✅ Cliente seleccionado:', cliente);
-      }
-
       const res = await fetch(`/api/presupuestos/${presupuesto_id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipo_venta: confirmar ? 'contado' : 'fiado',
-          cliente_id: cliente_id,
-          monto_pagado: confirmar ? undefined : 0
-        })
+        method: 'DELETE'
       });
-
       const data = await res.json();
 
-      console.log('📦 Respuesta de conversión:', data);
-
       if (data.success) {
-        alert(`✅ Presupuesto convertido a Venta #${data.venta_id}`);
         cargarPresupuestos();
       } else {
         alert('Error: ' + data.error);
       }
     } catch (error) {
-      console.error('❌ Error al convertir:', error);
-      alert('Error al convertir presupuesto: ' + (error instanceof Error ? error.message : 'Error desconocido'));
+      console.error('❌ Error al eliminar:', error);
+      alert('Error al eliminar presupuesto');
     }
+  };
+
+  const convertirAVenta = (presupuesto_id: number) => {
+    // Redirigir al POS con el ID del presupuesto para cargar
+    router.push(`/?convertir_presupuesto=${presupuesto_id}`);
   };
 
   return (
@@ -362,12 +330,20 @@ export default function PresupuestosPage() {
                       </button>
 
                       {presupuesto.estado === 'pendiente' && (
-                        <button
-                          onClick={() => convertirAVenta(presupuesto.id)}
-                          className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap"
-                        >
-                          ✅ Convertir a Venta
-                        </button>
+                        <>
+                          <button
+                            onClick={() => convertirAVenta(presupuesto.id)}
+                            className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap"
+                          >
+                            ✅ Convertir a Venta
+                          </button>
+                          <button
+                            onClick={() => eliminarPresupuesto(presupuesto.id)}
+                            className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap"
+                          >
+                            🗑️ Eliminar
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>

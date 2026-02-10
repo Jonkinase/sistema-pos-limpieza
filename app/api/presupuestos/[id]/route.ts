@@ -162,3 +162,50 @@ export async function POST(
     client.release();
   }
 }
+// Eliminar presupuesto
+export async function DELETE(
+  request: NextRequest,
+  context: RouteContext
+) {
+  const client = await db.connect();
+  try {
+    const { id } = await context.params;
+
+    console.log('🗑️ Eliminando presupuesto ID:', id);
+
+    await client.query('BEGIN');
+
+    // 1. Eliminar detalles
+    await client.query('DELETE FROM detalle_presupuestos WHERE presupuesto_id = $1', [id]);
+
+    // 2. Eliminar presupuesto
+    const result = await client.query('DELETE FROM presupuestos WHERE id = $1', [id]);
+
+    if (result.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return NextResponse.json({
+        success: false,
+        error: "Presupuesto no encontrado"
+      }, { status: 404 });
+    }
+
+    await client.query('COMMIT');
+
+    console.log('✅ Presupuesto eliminado correctamente');
+
+    return NextResponse.json({
+      success: true,
+      mensaje: "Presupuesto eliminado correctamente"
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error al eliminar presupuesto:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : "Error al eliminar presupuesto"
+    }, { status: 500 });
+  } finally {
+    client.release();
+  }
+}

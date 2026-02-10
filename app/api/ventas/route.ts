@@ -79,6 +79,16 @@ export async function POST(request: Request) {
       await client.query('UPDATE clientes SET saldo_deuda = saldo_deuda + $1 WHERE id = $2', [deuda, cliente_id]);
     }
 
+    // Si viene de un presupuesto, marcar el presupuesto como convertido
+    const { presupuesto_id } = body;
+    if (presupuesto_id) {
+      await client.query(`
+        UPDATE presupuestos 
+        SET estado = 'convertido', venta_id = $1 
+        WHERE id = $2
+      `, [venta_id, presupuesto_id]);
+    }
+
     await client.query('COMMIT');
 
     return NextResponse.json({

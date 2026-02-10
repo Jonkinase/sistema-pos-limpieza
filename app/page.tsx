@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 type Producto = {
   id: number;
@@ -33,10 +33,17 @@ type ItemCarrito = {
   tipo_precio: string;
 };
 
+type Cliente = {
+  id: number;
+  nombre: string;
+  saldo_deuda: number;
+};
+
 import SalesTable from '@/components/SalesTable';
 
 export default function PuntoDeVenta() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [stocks, setStocks] = useState<Stock[]>([]);
@@ -53,6 +60,10 @@ export default function PuntoDeVenta() {
   const [salesRefreshTrigger, setSalesRefreshTrigger] = useState(0);
   const [user, setUser] = useState<any>(null); // State for current user
   const [idVentaEditando, setIdVentaEditando] = useState<number | null>(null);
+  const [idPresupuestoConvertiendo, setIdPresupuestoConvertiendo] = useState<number | null>(null);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<number | null>(null); // null = Consumidor Final
+  const [tipoVenta, setTipoVenta] = useState<'contado' | 'fiado'>('contado');
 
   // Cerrar sesión
   const cerrarSesion = async () => {
@@ -110,7 +121,53 @@ export default function PuntoDeVenta() {
           setSucursalSeleccionada(prev => prev ?? data.sucursales[0].id);
         }
       });
-  }, [salesRefreshTrigger]);
+
+    // Fetch clients
+    if (sucursalSeleccionada) {
+      fetch(`/api/clientes?sucursal_id=${sucursalSeleccionada}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setClientes(data.clientes || []);
+          }
+        });
+    }
+
+    // Cargar presupuesto si viene por query param
+    const presupuestoId = searchParams.get('convertir_presupuesto');
+    if (presupuestoId && !idPresupuestoConvertiendo) {
+      fetch(`/api/presupuestos/${presupuestoId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            const { presupuesto, detalles } = data;
+
+            // Si el presupuesto tiene un cliente_nombre, intentar asociarlo
+            // NOTA: El sistema asocia por ID, si el presupuesto solo tiene texto, 
+            // el usuario deberá seleccionar el cliente manualmente en el carrito.
+            // Pero si el cliente existe, podemos pre-seleccionarlo.
+            const clienteExistente = clientes.find(c => c.nombre.toLowerCase() === presupuesto.cliente_nombre.toLowerCase());
+            if (clienteExistente) setClienteSeleccionado(clienteExistente.id);
+
+            const itemsBudget: ItemCarrito[] = detalles.map((item: any) => ({
+              producto_id: item.producto_id,
+              producto_nombre: item.producto_nombre,
+              litros: parseFloat(item.cantidad_litros),
+              precio_unitario: parseFloat(item.precio_unitario),
+              subtotal: parseFloat(item.subtotal),
+              tipo_precio: item.tipo_precio || 'Minorista'
+            }));
+
+            setCarrito(itemsBudget);
+            setIdPresupuestoConvertiendo(presupuesto.id);
+            setSucursalSeleccionada(presupuesto.sucursal_id);
+
+            // Limpiar el query param para evitar recargas infinitas
+            router.replace('/', { scroll: false });
+          }
+        });
+    }
+  }, [salesRefreshTrigger, sucursalSeleccionada, searchParams]);
 
   const stockActualSeleccionado = (() => {
     if (!productoSeleccionado || !sucursalSeleccionada) return null;
@@ -317,30 +374,6 @@ export default function PuntoDeVenta() {
       return;
     }
 
-    const tipoVenta = confirm('¿Es venta al CONTADO?\n\nOK = Contado\nCancelar = Fiado');
-
-    let cliente_id = null;
-
-    if (!tipoVenta) {
-      // Es fiado, pedir cliente
-      const clienteNombre = prompt('Ingresa el nombre del cliente (debe existir):');
-      if (!clienteNombre) return;
-
-      // Buscar cliente
-      const resClientes = await fetch(`/api/clientes?sucursal_id=${sucursalSeleccionada}`);
-      const dataClientes = await resClientes.json();
-      const cliente = dataClientes.clientes.find((c: any) =>
-        c.nombre.toLowerCase().includes(clienteNombre.toLowerCase())
-      );
-
-      if (!cliente) {
-        alert('Cliente no encontrado. Créalo primero en Cuentas Corrientes.');
-        return;
-      }
-
-      cliente_id = cliente.id;
-    }
-
     try {
       // Si estamos editando, primero eliminamos la venta anterior
       if (idVentaEditando) {
@@ -358,25 +391,25 @@ export default function PuntoDeVenta() {
         body: JSON.stringify({
           sucursal_id: sucursalSeleccionada,
           items: carrito,
-          tipo_venta: tipoVenta ? 'contado' : 'fiado',
-          cliente_id: cliente_id,
-          monto_pagado: tipoVenta ? totalCarrito : 0
+          tipo_venta: tipoVenta,
+          cliente_id: clienteSeleccionado,
+          monto_pagado: tipoVenta === 'contado' ? totalCarrito : 0,
+          presupuesto_id: idPresupuestoConvertiendo // Enviar ID del presupuesto para marcar como convertido
         })
       });
 
       const data = await res.json();
       if (data.success) {
-        if (tipoVenta) {
-          alert(`✅ Venta #${data.venta_id} registrada. Total: $${data.total}`);
-        } else {
-          alert(`✅ Venta #${data.venta_id} registrada A CRÉDITO. Total: $${data.total}`);
-        }
-        const quiereTicket = confirm('¿Deseas imprimir el ticket de esta venta?');
+        const quiereTicket = confirm('Venta realizada con exito, desea imprimir ticket?');
         if (quiereTicket && data.venta_id) {
           window.open(`/ticket/${data.venta_id}`, '_blank');
         }
+
         setCarrito([]);
+        setClienteSeleccionado(null); // Reset to Consumidor Final
+        setTipoVenta('contado');      // Reset to Contado
         setIdVentaEditando(null); // Reset edit mode
+        setIdPresupuestoConvertiendo(null); // Reset budget mode
         setSalesRefreshTrigger(prev => prev + 1); // Refresh sales table and stock
       } else {
         alert('Error: ' + data.error);
@@ -597,6 +630,63 @@ export default function PuntoDeVenta() {
                 </div>
 
                 <div className="border-t-2 border-gray-300 pt-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    {/* Selección de Cliente */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        👤 Cliente:
+                      </label>
+                      <select
+                        className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+                        value={clienteSeleccionado ?? ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const newId = val === '' ? null : Number(val);
+                          setClienteSeleccionado(newId);
+                          // Si vuelve a consumidor final, forzar contado
+                          if (newId === null) setTipoVenta('contado');
+                        }}
+                      >
+                        <option value="">Consumidor Final</option>
+                        {clientes.map(c => (
+                          <option key={c.id} value={c.id}>{c.nombre}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Tipo de Venta */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        💳 Tipo de Venta:
+                      </label>
+                      <div className="flex gap-4 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-800">
+                          <input
+                            type="radio"
+                            name="tipoVenta"
+                            value="contado"
+                            checked={tipoVenta === 'contado'}
+                            onChange={() => setTipoVenta('contado')}
+                            className="w-4 h-4 text-blue-600"
+                          />
+                          Contado
+                        </label>
+                        <label className={`flex items-center gap-2 cursor-pointer text-sm font-medium ${clienteSeleccionado === null ? 'opacity-40 cursor-not-allowed text-gray-400' : 'text-gray-800'}`}>
+                          <input
+                            type="radio"
+                            name="tipoVenta"
+                            value="fiado"
+                            checked={tipoVenta === 'fiado'}
+                            disabled={clienteSeleccionado === null}
+                            onChange={() => setTipoVenta('fiado')}
+                            className="w-4 h-4 text-blue-600"
+                          />
+                          Fiado
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex justify-between items-center">
                     <span className="text-2xl font-bold text-gray-800">TOTAL:</span>
                     <span className="text-3xl font-bold text-blue-600">
