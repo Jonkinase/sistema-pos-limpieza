@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import jsPDF from 'jspdf';
 
 type Producto = {
   id: number;
@@ -308,6 +309,92 @@ export default function InventarioPage() {
       });
   };
 
+  const exportarPreciosPDF = () => {
+    const doc = new jsPDF();
+    const colorNaranja = [243, 156, 18]; // Naranja para el header similar a la imagen
+    const colorTexto = [44, 62, 80];
+
+    // Ordenar productos: Líquidos primero, luego Secos, ambos alfabéticamente
+    const productosOrdenados = [...productos].sort((a: any, b: any) => {
+      const tipoA = a.tipo || 'liquido';
+      const tipoB = b.tipo || 'liquido';
+
+      if (tipoA === 'liquido' && tipoB === 'seco') return -1;
+      if (tipoA === 'seco' && tipoB === 'liquido') return 1;
+
+      return a.nombre.localeCompare(b.nombre);
+    });
+
+    let y = 15;
+
+    const dibujarHeader = (pagina: number) => {
+      // Banner que ocupa todo el ancho
+      const bannerWidth = 210;
+      const bannerHeight = 50; // Altura ajustada para el banner
+
+      try {
+        doc.addImage('/banner-listaprecio.png', 'PNG', 0, 0, bannerWidth, bannerHeight);
+      } catch (e) {
+        console.error('No se pudo cargar el banner', e);
+        // Fallback simple si falla la imagen
+        doc.setFillColor(colorNaranja[0], colorNaranja[1], colorNaranja[2]);
+        doc.rect(0, 0, 210, 35, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(24);
+        doc.text('CHOPPER LIMPIEZA', 105, 20, { align: 'center' });
+      }
+
+      // Headers de la tabla (ajustado para que no tape el banner)
+      y = bannerHeight + 10;
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.5);
+      doc.line(10, y - 5, 200, y - 5); // Linea superior header tabla
+
+      doc.setTextColor(colorTexto[0], colorTexto[1], colorTexto[2]);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Descripcion de Productos', 15, y);
+      doc.text('Menor', 160, y, { align: 'right' });
+      doc.text('Mayor', 190, y, { align: 'right' });
+
+      doc.line(10, y + 2, 200, y + 2); // Linea inferior header tabla
+      y += 8;
+    };
+
+    dibujarHeader(1);
+
+    productosOrdenados.forEach((prod: any) => {
+      if (y > 280) {
+        doc.addPage();
+        dibujarHeader(doc.getNumberOfPages());
+      }
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+
+      // Ajustar nombre si es muy largo
+      const nombre = prod.nombre.length > 65 ? prod.nombre.substring(0, 62) + '...' : prod.nombre;
+      doc.text(nombre, 15, y);
+
+      doc.setFont('helvetica', 'normal');
+      doc.text(`$ ${Number(prod.precio_minorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 160, y, { align: 'right' });
+
+      const precioMayorista = prod.precio_mayorista
+        ? `$ ${Number(prod.precio_mayorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+        : '-';
+      doc.text(precioMayorista, 190, y, { align: 'right' });
+
+      // Linea divisoria tenue
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.1);
+      doc.line(10, y + 2, 200, y + 2);
+
+      y += 7;
+    });
+
+    doc.save(`Lista_Precios_Chopper_Limpieza_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-emerald-100 p-6">
       <div className="max-w-6xl mx-auto">
@@ -336,6 +423,12 @@ export default function InventarioPage() {
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg"
               >
                 ➕ Nuevo Producto
+              </button>
+              <button
+                onClick={exportarPreciosPDF}
+                className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg whitespace-nowrap"
+              >
+                📄 Exportar Tabla Precios
               </button>
               <Link
                 href="/"

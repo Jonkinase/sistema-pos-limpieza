@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@sistema.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export default function LoginPage() {
               className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-gray-900"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@sistema.com"
+              placeholder="tu@email.com"
             />
           </div>
 
@@ -80,10 +80,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Contraseña"
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Usuario por defecto: <span className="font-semibold">admin@sistema.com</span> /{' '}
-              <span className="font-semibold">admin123</span>
-            </p>
+
           </div>
 
           {error && (
