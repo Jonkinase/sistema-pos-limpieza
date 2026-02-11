@@ -121,7 +121,7 @@ export default function TicketPage() {
                   </div>
                   <div className="flex justify-between text-[10px] text-gray-600">
                     <span>
-                      {item.producto_tipo === 'seco'
+                      {item.producto_tipo === 'seco' || !item.producto_tipo
                         ? `${Math.floor(item.cantidad_litros)} u. x $${item.precio_unitario.toFixed(2)}`
                         : (item.producto_tipo === 'alimento'
                           ? `${item.cantidad_litros.toFixed(2)} kg x $${item.precio_unitario.toFixed(2)}`

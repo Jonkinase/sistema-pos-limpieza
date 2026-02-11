@@ -205,6 +205,27 @@ export async function initDatabase() {
       `, ['Administrador', 'admin@sistema.com', passwordHash, 'admin']);
     }
 
+    // Migración para Item Rápido y Seguridad Histórica
+    try {
+      // 1. Añadir columna producto_nombre si no existe
+      await client.query('ALTER TABLE detalle_ventas ADD COLUMN IF NOT EXISTS producto_nombre TEXT');
+
+      // 2. Migrar nombres actuales de productos a los detalles de venta (Congelar historial)
+      await client.query(`
+        UPDATE detalle_ventas dv
+        SET producto_nombre = p.nombre
+        FROM productos p
+        WHERE dv.producto_id = p.id AND dv.producto_nombre IS NULL
+      `);
+
+      // 3. Hacer que producto_id sea opcional (nullable) para permitir items rápidos
+      await client.query('ALTER TABLE detalle_ventas ALTER COLUMN producto_id DROP NOT NULL');
+
+      console.log('✅ Migración de Item Rápido y Seguridad Histórica completada');
+    } catch (e) {
+      console.error('❌ Error en migración de Item Rápido:', e);
+    }
+
     await client.query('COMMIT');
     console.log('✅ Base de datos PostgreSQL inicializada correctamente');
   } catch (error) {

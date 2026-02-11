@@ -47,10 +47,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       `
       SELECT 
         dv.*,
-        p.nombre AS producto_nombre,
+        COALESCE(dv.producto_nombre, p.nombre) AS producto_nombre,
         p.tipo AS producto_tipo
       FROM detalle_ventas dv
-      JOIN productos p ON dv.producto_id = p.id
+      LEFT JOIN productos p ON dv.producto_id = p.id
       WHERE dv.venta_id = $1
     `,
       [ventaId]

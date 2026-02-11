@@ -68,6 +68,11 @@ export default function PuntoDeVenta() {
   const [clienteSeleccionado, setClienteSeleccionado] = useState<number | null>(null); // null = Consumidor Final
   const [tipoVenta, setTipoVenta] = useState<'contado' | 'fiado'>('contado');
 
+  // Estado Item Rápido
+  const [modalItemRapidoAbierto, setModalItemRapidoAbierto] = useState(false);
+  const [nombreItemRapido, setNombreItemRapido] = useState('');
+  const [precioItemRapido, setPrecioItemRapido] = useState('');
+
   // Cerrar sesión
   const cerrarSesion = async () => {
     try {
@@ -305,6 +310,28 @@ export default function PuntoDeVenta() {
     cerrarModal();
   };
 
+  // Agregar Item Rápido
+  const agregarItemRapido = () => {
+    if (!nombreItemRapido || !precioItemRapido) {
+      alert('Ingresa nombre y precio');
+      return;
+    }
+
+    const nuevoItem: ItemCarrito = {
+      producto_id: 0, // 0 o null para indicar item rápido
+      producto_nombre: nombreItemRapido,
+      litros: 1,
+      precio_unitario: parseFloat(precioItemRapido),
+      subtotal: parseFloat(precioItemRapido),
+      tipo_precio: 'Varios'
+    };
+
+    setCarrito([...carrito, nuevoItem]);
+    setModalItemRapidoAbierto(false);
+    setNombreItemRapido('');
+    setPrecioItemRapido('');
+  };
+
   // Cargar venta para editar
   const handleEditSale = async (venta: any) => {
     if (carrito.length > 0) {
@@ -527,9 +554,17 @@ export default function PuntoDeVenta() {
 
           {/* Panel Izquierdo: Seleccionar Productos */}
           <div className="bg-white rounded-2xl shadow-lg p-4">
-            <h2 className="text-xl font-bold text-gray-800 mb-3">
-              📦 Selecciona un Producto
-            </h2>
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-xl font-bold text-gray-800">
+                📦 Selecciona un Producto
+              </h2>
+              <button
+                onClick={() => setModalItemRapidoAbierto(true)}
+                className="bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-bold py-1 px-2 rounded-lg transition"
+              >
+                ➕ Item Rápido
+              </button>
+            </div>
 
             {/* Buscador de productos */}
             <div className="relative mb-3">
@@ -631,7 +666,7 @@ export default function PuntoDeVenta() {
                         <div>
                           <p className="font-bold text-gray-800">{item.producto_nombre}</p>
                           <p className="text-sm text-gray-600">
-                            {item.litros}{item.tipo_precio === 'Unidad' ? 'u' : (item.tipo_precio === 'Kg' ? 'kg' : 'L')} × ${item.precio_unitario}/{item.tipo_precio === 'Unidad' ? 'u' : (item.tipo_precio === 'Kg' ? 'kg' : 'L')}
+                            {item.litros}{item.tipo_precio === 'Unidad' || item.tipo_precio === 'Varios' ? 'u' : (item.tipo_precio === 'Kg' ? 'kg' : 'L')} × ${item.precio_unitario}/{item.tipo_precio === 'Unidad' || item.tipo_precio === 'Varios' ? 'u' : (item.tipo_precio === 'Kg' ? 'kg' : 'L')}
                             <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                               {item.tipo_precio}
                             </span>
@@ -963,6 +998,50 @@ export default function PuntoDeVenta() {
             >
               ➕ Agregar al Carrito
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Item Rápido */}
+      {modalItemRapidoAbierto && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative animate-in zoom-in duration-200">
+            <button
+              onClick={() => setModalItemRapidoAbierto(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl"
+            >
+              ✕
+            </button>
+            <h3 className="text-xl font-bold text-gray-800 mb-4">✨ Item Rápido</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Item:</label>
+                <input
+                  autoFocus
+                  type="text"
+                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900 focus:border-blue-500"
+                  placeholder="Ej: Diferencia por vuelto"
+                  value={nombreItemRapido}
+                  onChange={(e) => setNombreItemRapido(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Precio ($):</label>
+                <input
+                  type="number"
+                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900 focus:border-blue-500"
+                  placeholder="0.00"
+                  value={precioItemRapido}
+                  onChange={(e) => setPrecioItemRapido(e.target.value)}
+                />
+              </div>
+              <button
+                onClick={agregarItemRapido}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition mt-2"
+              >
+                ➕ Agregar al Carrito
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -27,26 +27,28 @@ export async function POST(request: Request) {
     const total = items.reduce((sum: number, item: any) => sum + item.subtotal, 0);
     const pagado = monto_pagado !== undefined ? monto_pagado : total;
 
-    // Verificar stock disponible por producto en la sucursal
+    // Verificar stock disponible por producto en la sucursal (solo si producto_id existe)
     for (const item of items) {
-      const stockResult = await client.query(
-        'SELECT cantidad_litros FROM stock WHERE producto_id = $1 AND sucursal_id = $2',
-        [item.producto_id, sucursal_id]
-      );
-      const stockRow = stockResult.rows[0];
-      const disponible = stockRow?.cantidad_litros ?? 0;
-
-      if (Number(disponible) < Number(item.litros)) {
-        const productoInfo = await client.query('SELECT tipo FROM productos WHERE id = $1', [item.producto_id]);
-        const tipo = productoInfo.rows[0]?.tipo || 'liquido';
-        const unit = tipo === 'seco' ? 'u.' : (tipo === 'alimento' ? 'kg' : 'L');
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Stock insuficiente para el producto ID ${item.producto_id}. Disponible: ${parseFloat(disponible).toFixed(2)}${unit}`
-          },
-          { status: 400 }
+      if (item.producto_id) {
+        const stockResult = await client.query(
+          'SELECT cantidad_litros FROM stock WHERE producto_id = $1 AND sucursal_id = $2',
+          [item.producto_id, sucursal_id]
         );
+        const stockRow = stockResult.rows[0];
+        const disponible = stockRow?.cantidad_litros ?? 0;
+
+        if (Number(disponible) < Number(item.litros)) {
+          const productoInfo = await client.query('SELECT tipo FROM productos WHERE id = $1', [item.producto_id]);
+          const tipo = productoInfo.rows[0]?.tipo || 'liquido';
+          const unit = tipo === 'seco' ? 'u.' : (tipo === 'alimento' ? 'kg' : 'L');
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Stock insuficiente para el producto ID ${item.producto_id}. Disponible: ${parseFloat(disponible).toFixed(2)}${unit}`
+            },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -62,18 +64,20 @@ export async function POST(request: Request) {
     const venta_id = ventaResult.rows[0].id;
 
     for (const item of items) {
-      // Insertar detalle
+      // Insertar detalle con nombre personalizado (Item Rápido u Historial)
       await client.query(`
-        INSERT INTO detalle_ventas (venta_id, producto_id, cantidad_litros, precio_unitario, subtotal)
-        VALUES ($1, $2, $3, $4, $5)
-      `, [venta_id, item.producto_id, item.litros, item.precio_unitario, item.subtotal]);
+        INSERT INTO detalle_ventas (venta_id, producto_id, producto_nombre, cantidad_litros, precio_unitario, subtotal)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [venta_id, item.producto_id || null, item.producto_nombre || null, item.litros, item.precio_unitario, item.subtotal]);
 
-      // Actualizar stock
-      await client.query(`
-        UPDATE stock
-        SET cantidad_litros = cantidad_litros - $1
-        WHERE producto_id = $2 AND sucursal_id = $3
-      `, [item.litros, item.producto_id, sucursal_id]);
+      // Actualizar stock (solo si producto_id existe)
+      if (item.producto_id) {
+        await client.query(`
+          UPDATE stock
+          SET cantidad_litros = cantidad_litros - $1
+          WHERE producto_id = $2 AND sucursal_id = $3
+        `, [item.litros, item.producto_id, sucursal_id]);
+      }
     }
 
     // Si es fiado, actualizar deuda del cliente
@@ -125,9 +129,9 @@ export async function GET(request: Request) {
         u.nombre as vendedor_nombre,
         s.nombre as sucursal,
         (SELECT COUNT(*) FROM detalle_ventas WHERE venta_id = v.id) as items_count,
-        (SELECT STRING_AGG(p.nombre || ' (' || 
+        (SELECT STRING_AGG(COALESCE(dv.producto_nombre, p.nombre) || ' (' || 
           CASE 
-            WHEN p.tipo = 'seco' THEN CAST(dv.cantidad_litros AS INT) || 'u.' 
+            WHEN p.tipo = 'seco' OR dv.producto_id IS NULL THEN CAST(dv.cantidad_litros AS INT) || 'u.' 
             WHEN p.tipo = 'alimento' THEN dv.cantidad_litros || 'kg'
             ELSE dv.cantidad_litros || 'L' 
           END || ')', ', ') 
@@ -178,11 +182,13 @@ export async function DELETE(request: Request) {
     const items = itemsResult.rows;
 
     for (const item of items) {
-      await client.query(`
-        UPDATE stock
-        SET cantidad_litros = cantidad_litros + $1
-        WHERE producto_id = $2 AND sucursal_id = $3
-      `, [item.cantidad_litros, item.producto_id, venta.sucursal_id]);
+      if (item.producto_id) {
+        await client.query(`
+          UPDATE stock
+          SET cantidad_litros = cantidad_litros + $1
+          WHERE producto_id = $2 AND sucursal_id = $3
+        `, [item.cantidad_litros, item.producto_id, venta.sucursal_id]);
+      }
     }
 
     // 2. Revertir saldo cliente si fue fiado
