@@ -34,13 +34,18 @@ export default function InventarioPage() {
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
 
-  // Estado para búsqueda
+  // Estado para búsqueda y filtro
   const [busqueda, setBusqueda] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('todos');
 
-  // Filtrar productos
-  const productosFiltrados = productos.filter(p =>
-    p.nombre.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  // Filtrar y ordenar productos
+  const productosFiltrados = productos
+    .filter(p => {
+      const cumpleNombre = p.nombre.toLowerCase().includes(busqueda.toLowerCase());
+      const cumpleTipo = filtroTipo === 'todos' || p.tipo === filtroTipo;
+      return cumpleNombre && cumpleTipo;
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
   const eliminarProducto = async (id: number, nombre: string) => {
     if (!confirm(`¿Estás seguro de ELIMINAR el producto "${nombre}"?\n\n⚠️ Esta acción no se puede deshacer.`)) {
@@ -319,8 +324,8 @@ export default function InventarioPage() {
     const colorNaranja = [243, 156, 18]; // Naranja para el header similar a la imagen
     const colorTexto = [44, 62, 80];
 
-    // Ordenar productos: Líquidos primero, luego Secos, ambos alfabéticamente
-    const productosOrdenados = [...productos].sort((a: any, b: any) => {
+    // Usar productos ya filtrados por el usuario
+    const productosAExportar = [...productosFiltrados].sort((a: any, b: any) => {
       const tipoA = a.tipo || 'liquido';
       const tipoB = b.tipo || 'liquido';
 
@@ -368,7 +373,7 @@ export default function InventarioPage() {
 
     dibujarHeader(1);
 
-    productosOrdenados.forEach((prod: any) => {
+    productosAExportar.forEach((prod: any) => {
       if (y > 280) {
         doc.addPage();
         dibujarHeader(doc.getNumberOfPages());
@@ -423,6 +428,15 @@ export default function InventarioPage() {
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
               />
+              <select
+                className="p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none w-full md:w-40 text-gray-900 bg-white"
+                value={filtroTipo}
+                onChange={(e) => setFiltroTipo(e.target.value)}
+              >
+                <option value="todos">Todos los tipos</option>
+                <option value="liquido">Solo Líquidos</option>
+                <option value="seco">Solo Secos</option>
+              </select>
               <button
                 onClick={abrirModalCrear}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg"
