@@ -36,11 +36,14 @@ export async function POST(request: Request) {
       const stockRow = stockResult.rows[0];
       const disponible = stockRow?.cantidad_litros ?? 0;
 
-      if (disponible < item.litros) {
+      if (Number(disponible) < Number(item.litros)) {
+        const productoInfo = await client.query('SELECT tipo FROM productos WHERE id = $1', [item.producto_id]);
+        const tipo = productoInfo.rows[0]?.tipo || 'liquido';
+        const unit = tipo === 'seco' ? 'u.' : (tipo === 'alimento' ? 'kg' : 'L');
         return NextResponse.json(
           {
             success: false,
-            error: `Stock insuficiente para el producto ID ${item.producto_id}. Disponible: ${parseFloat(disponible).toFixed(2)}L`
+            error: `Stock insuficiente para el producto ID ${item.producto_id}. Disponible: ${parseFloat(disponible).toFixed(2)}${unit}`
           },
           { status: 400 }
         );
@@ -125,6 +128,7 @@ export async function GET(request: Request) {
         (SELECT STRING_AGG(p.nombre || ' (' || 
           CASE 
             WHEN p.tipo = 'seco' THEN CAST(dv.cantidad_litros AS INT) || 'u.' 
+            WHEN p.tipo = 'alimento' THEN dv.cantidad_litros || 'kg'
             ELSE dv.cantidad_litros || 'L' 
           END || ')', ', ') 
          FROM detalle_ventas dv 

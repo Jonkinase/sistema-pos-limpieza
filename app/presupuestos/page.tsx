@@ -155,7 +155,7 @@ export default function PresupuestosPage() {
 
       doc.text('Producto', 25, y);
       doc.text('Cantidad', 100, y);
-      doc.text('Precio/L', 130, y);
+      doc.text('Precio/Un/L/Kg', 130, y);
       doc.text('Subtotal', 165, y);
 
       y += 10;
@@ -170,7 +170,8 @@ export default function PresupuestosPage() {
         }
 
         doc.text(detalle.producto_nombre, 25, y);
-        doc.text(`${detalle.cantidad_litros} L`, 100, y);
+        const unitLabel = detalle.tipo_precio === 'Unidad' ? 'u' : (detalle.tipo_precio === 'Kg' ? 'kg' : 'L');
+        doc.text(`${detalle.cantidad_litros} ${unitLabel}`, 100, y);
         doc.text(`$${detalle.precio_unitario}`, 130, y);
         doc.text(`$${detalle.subtotal.toFixed(2)}`, 165, y);
 

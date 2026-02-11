@@ -123,7 +123,10 @@ export default function TicketPage() {
                     <span>
                       {item.producto_tipo === 'seco'
                         ? `${Math.floor(item.cantidad_litros)} u. x $${item.precio_unitario.toFixed(2)}`
-                        : `${item.cantidad_litros.toFixed(2)} L x $${item.precio_unitario.toFixed(2)}`
+                        : (item.producto_tipo === 'alimento'
+                          ? `${item.cantidad_litros.toFixed(2)} kg x $${item.precio_unitario.toFixed(2)}`
+                          : `${item.cantidad_litros.toFixed(2)} L x $${item.precio_unitario.toFixed(2)}`
+                        )
                       }
                     </span>
                   </div>

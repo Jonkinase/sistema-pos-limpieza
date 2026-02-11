@@ -8,6 +8,10 @@ import jsPDF from 'jspdf';
 type Producto = {
   id: number;
   nombre: string;
+  tipo?: string;
+  precio_minorista: number;
+  precio_mayorista: number;
+  litros_minimo_mayorista: number;
 };
 
 type Sucursal = {
@@ -42,7 +46,7 @@ export default function InventarioPage() {
   const productosFiltrados = productos
     .filter(p => {
       const cumpleNombre = p.nombre.toLowerCase().includes(busqueda.toLowerCase());
-      const cumpleTipo = filtroTipo === 'todos' || p.tipo === filtroTipo;
+      const cumpleTipo = filtroTipo === 'todos' || (filtroTipo === 'liquido' && (p.tipo === 'liquido' || !p.tipo)) || p.tipo === filtroTipo;
       return cumpleNombre && cumpleTipo;
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
@@ -126,6 +130,9 @@ export default function InventarioPage() {
           producto_id,
           sucursal_id,
           cantidad_litros: valor,
+          precio_minorista: 0,
+          precio_mayorista: 0,
+          activo: 1
         },
       ];
     });
@@ -185,6 +192,8 @@ export default function InventarioPage() {
   const [formProducto, setFormProducto] = useState({
     nombre: '',
     tipo: 'liquido',
+    precio_minorista: '',
+    precio_mayorista: '',
     litros_minimo_mayorista: '5',
     stock_actual: '', // Solo usado para editar stock
     activo: 1
@@ -194,6 +203,7 @@ export default function InventarioPage() {
     setFormProducto({
       nombre: '',
       tipo: 'liquido',
+      precio_minorista: '',
       precio_mayorista: '',
       litros_minimo_mayorista: '5',
       stock_actual: '0',
@@ -233,7 +243,7 @@ export default function InventarioPage() {
           nombre: formProducto.nombre,
           tipo: formProducto.tipo,
           precio_minorista: parseFloat(formProducto.precio_minorista),
-          precio_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : null,
+          precio_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : (formProducto.tipo === 'alimento' ? parseFloat(formProducto.precio_minorista) : null),
           litros_minimo_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.litros_minimo_mayorista) : null,
           stock_inicial: parseFloat(formProducto.stock_actual || '0'),
           sucursal_id: sucursalSeleccionada
@@ -274,7 +284,7 @@ export default function InventarioPage() {
       // 2. Actualizar Configuración por Sucursal (Stock, Precios, Activo)
       const nuevaCantidad = parseFloat(formProducto.stock_actual);
       const nuevoPrecioMin = parseFloat(formProducto.precio_minorista);
-      const nuevoPrecioMay = formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : nuevoPrecioMin;
+      const nuevoPrecioMay = formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : (formProducto.tipo === 'alimento' ? nuevoPrecioMin : nuevoPrecioMin);
       const nuevoActivo = formProducto.activo;
 
       const resStock = await fetch('/api/stock', {
@@ -329,8 +339,12 @@ export default function InventarioPage() {
       const tipoA = a.tipo || 'liquido';
       const tipoB = b.tipo || 'liquido';
 
+      if (tipoA === 'liquido' && tipoB === 'alimento') return -1;
+      if (tipoA === 'alimento' && tipoB === 'liquido') return 1;
       if (tipoA === 'liquido' && tipoB === 'seco') return -1;
       if (tipoA === 'seco' && tipoB === 'liquido') return 1;
+      if (tipoA === 'alimento' && tipoB === 'seco') return -1;
+      if (tipoA === 'seco' && tipoB === 'alimento') return 1;
 
       return a.nombre.localeCompare(b.nombre);
     });
@@ -387,10 +401,11 @@ export default function InventarioPage() {
       doc.text(nombre, 15, y);
 
       doc.setFont('helvetica', 'normal');
-      doc.text(`$ ${Number(prod.precio_minorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 160, y, { align: 'right' });
+      const unitLabel = prod.tipo === 'seco' ? 'u.' : (prod.tipo === 'alimento' ? 'kg' : 'L');
+      doc.text(`$ ${Number(prod.precio_minorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })} /${unitLabel}`, 160, y, { align: 'right' });
 
-      const precioMayorista = prod.precio_mayorista
-        ? `$ ${Number(prod.precio_mayorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+      const precioMayorista = prod.precio_mayorista && prod.tipo !== 'alimento'
+        ? `$ ${Number(prod.precio_mayorista).toLocaleString('es-AR', { minimumFractionDigits: 2 })} /${unitLabel}`
         : '-';
       doc.text(precioMayorista, 190, y, { align: 'right' });
 
@@ -435,6 +450,7 @@ export default function InventarioPage() {
               >
                 <option value="todos">Todos los tipos</option>
                 <option value="liquido">Solo Líquidos</option>
+                <option value="alimento">Solo Alimentos</option>
                 <option value="seco">Solo Secos</option>
               </select>
               <button
@@ -538,7 +554,7 @@ export default function InventarioPage() {
                           {producto.nombre}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-600 border-b capitalize">
-                          {producto.tipo || 'Líquido'}
+                          {producto.tipo === 'alimento' ? 'Alimento' : (producto.tipo || 'Líquido')}
                         </td>
                         <td className="px-4 py-2 text-sm text-right border-b font-bold text-gray-700">
                           ${Number(pMinorista).toFixed(2)}
@@ -549,7 +565,7 @@ export default function InventarioPage() {
                         <td className="px-4 py-2 text-sm text-right border-b font-bold text-emerald-700">
                           {producto.tipo === 'seco' ? Math.floor(Number(actual)) : Number(actual).toFixed(2)}
                           <span className="text-gray-400 text-xs ml-1 font-normal">
-                            {producto.tipo === 'seco' ? 'u.' : 'L'}
+                            {producto.tipo === 'seco' ? 'u.' : (producto.tipo === 'alimento' ? 'kg' : 'L')}
                           </span>
                         </td>
                         <td className="px-4 py-2 text-sm text-center border-b">
@@ -612,6 +628,15 @@ export default function InventarioPage() {
                       💧 Líquido (Granel)
                     </button>
                     <button
+                      onClick={() => setFormProducto({ ...formProducto, tipo: 'alimento' })}
+                      className={`flex-1 py-2 rounded-lg font-bold border transition-all ${formProducto.tipo === 'alimento'
+                        ? 'bg-amber-600 text-white border-amber-700'
+                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                        }`}
+                    >
+                      🦴 Alimento (kg)
+                    </button>
+                    <button
                       onClick={() => setFormProducto({ ...formProducto, tipo: 'seco' })}
                       className={`flex-1 py-2 rounded-lg font-bold border transition-all ${formProducto.tipo === 'seco'
                         ? 'bg-orange-500 text-white border-orange-600'
@@ -630,7 +655,7 @@ export default function InventarioPage() {
                     className="w-full mt-1 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
                     value={formProducto.nombre}
                     onChange={e => setFormProducto({ ...formProducto, nombre: e.target.value })}
-                    placeholder={formProducto.tipo === 'liquido' ? 'Ej: Detergente Premium' : 'Ej: Escoba Dura'}
+                    placeholder={formProducto.tipo === 'liquido' ? 'Ej: Detergente Premium' : (formProducto.tipo === 'alimento' ? 'Ej: Alimento Perro Adulto' : 'Ej: Escoba Dura')}
                   />
                 </div>
 
@@ -648,14 +673,16 @@ export default function InventarioPage() {
                       onChange={e => setFormProducto({ ...formProducto, stock_actual: e.target.value })}
                     />
                     <span className="text-gray-500 font-bold">
-                      {formProducto.tipo === 'seco' ? 'u.' : 'L'}
+                      {formProducto.tipo === 'seco' ? 'u.' : (formProducto.tipo === 'alimento' ? 'kg' : 'L')}
                     </span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Precio Minorista</label>
+                    <label className="block text-sm font-medium text-gray-700">
+                      {formProducto.tipo === 'alimento' ? 'Precio xKg' : 'Precio Minorista'}
+                    </label>
                     <div className="relative mt-1">
                       <span className="absolute left-3 top-2 text-gray-500">$</span>
                       <input

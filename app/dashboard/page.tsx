@@ -191,7 +191,7 @@ export default function DashboardPage() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 ml-10">
-                    {producto.litros_vendidos.toFixed(2)} Litros vendidos
+                    {producto.litros_vendidos.toFixed(2)} Vendidos (L/u/kg)
                   </p>
                 </div>
               ))}

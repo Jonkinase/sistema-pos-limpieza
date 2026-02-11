@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     let tipo_precio = 'minorista';
 
     // Paso 2: Verificar si alcanza para mayorista
-    if (litros >= litros_minimo_mayorista) {
+    if (item.tipo !== 'alimento' && litros >= litros_minimo_mayorista) {
       // Recalcular con precio mayorista
       litros = monto_pesos / precio_mayorista;
       precio_final_por_litro = precio_mayorista;

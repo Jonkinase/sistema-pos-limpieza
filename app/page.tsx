@@ -326,7 +326,9 @@ export default function PuntoDeVenta() {
           precio_unitario: parseFloat(item.precio_unitario),
           subtotal: parseFloat(item.subtotal),
           tipo_precio: item.producto_tipo === 'seco' ? 'Unidad' : (
-            parseFloat(item.cantidad_litros) >= items.find((i: any) => i.id === item.id)?.litros_minimo_mayorista ? 'Mayorista' : 'Minorista'
+            item.producto_tipo === 'alimento' ? 'Kg' : (
+              parseFloat(item.cantidad_litros) >= items.find((i: any) => i.id === item.id)?.litros_minimo_mayorista ? 'Mayorista' : 'Minorista'
+            )
           )
         }));
 
@@ -574,11 +576,14 @@ export default function PuntoDeVenta() {
                           <p className="text-gray-500">
                             {p.tipo === 'seco'
                               ? `$${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? p.precio_minorista} / u.`
-                              : `$${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? p.precio_minorista}/L • May: ${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_mayorista ?? p.precio_mayorista}/L`
+                              : (p.tipo === 'alimento'
+                                ? `$${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? p.precio_minorista}/kg`
+                                : `$${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? p.precio_minorista}/L • May: ${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_mayorista ?? p.precio_mayorista}/L`
+                              )
                             }
                           </p>
                           <p className={`font-medium ${stockProducto > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                            📦 {p.tipo === 'seco' ? Math.floor(stockProducto) : stockProducto.toFixed(1)} {p.tipo === 'seco' ? 'u.' : 'L'}
+                            📦 {p.tipo === 'seco' ? Math.floor(stockProducto) : stockProducto.toFixed(1)} {p.tipo === 'seco' ? 'u.' : (p.tipo === 'alimento' ? 'kg' : 'L')}
                           </p>
                         </div>
                       </div>
@@ -626,7 +631,7 @@ export default function PuntoDeVenta() {
                         <div>
                           <p className="font-bold text-gray-800">{item.producto_nombre}</p>
                           <p className="text-sm text-gray-600">
-                            {item.litros}{item.tipo_precio === 'Unidad' ? 'u' : 'L'} × ${item.precio_unitario}/{item.tipo_precio === 'Unidad' ? 'u' : 'L'}
+                            {item.litros}{item.tipo_precio === 'Unidad' ? 'u' : (item.tipo_precio === 'Kg' ? 'kg' : 'L')} × ${item.precio_unitario}/{item.tipo_precio === 'Unidad' ? 'u' : (item.tipo_precio === 'Kg' ? 'kg' : 'L')}
                             <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                               {item.tipo_precio}
                             </span>
@@ -762,8 +767,10 @@ export default function PuntoDeVenta() {
                 {productos.find(p => p.id === productoSeleccionado)?.nombre}
               </h3>
               <p className="text-sm text-gray-500 mt-1">
-                📦 Stock: {stockActualSeleccionado?.toFixed(1)} L •
-                Mayorista desde {productos.find(p => p.id === productoSeleccionado)?.litros_minimo_mayorista}L
+                📦 Stock: {stockActualSeleccionado?.toFixed(1)} {productos.find(p => p.id === productoSeleccionado)?.tipo === 'alimento' ? 'kg' : 'L'}
+                {productos.find(p => p.id === productoSeleccionado)?.tipo === 'liquido' && (
+                  `• Mayorista desde ${productos.find(p => p.id === productoSeleccionado)?.litros_minimo_mayorista}L`
+                )}
               </p>
             </div>
 
@@ -828,7 +835,7 @@ export default function PuntoDeVenta() {
                       : 'text-gray-600 hover:text-gray-800'
                       }`}
                   >
-                    🧴 Por Litros
+                    {productos.find(p => p.id === productoSeleccionado)?.tipo === 'alimento' ? '🦴 Por Kilos' : '🧴 Por Litros'}
                   </button>
                 </div>
               </>
@@ -876,14 +883,14 @@ export default function PuntoDeVenta() {
               ) : (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Cantidad en litros (L):
+                    {productos.find(p => p.id === productoSeleccionado)?.tipo === 'alimento' ? 'Cantidad en kilogramos (kg):' : 'Cantidad en litros (L):'}
                   </label>
                   <input
                     type="number"
-                    step="0.5"
+                    step={productos.find(p => p.id === productoSeleccionado)?.tipo === 'alimento' ? "0.1" : "0.5"}
                     autoFocus
                     className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-gray-900"
-                    placeholder="Ej: 5"
+                    placeholder={productos.find(p => p.id === productoSeleccionado)?.tipo === 'alimento' ? "Ej: 1" : "Ej: 5"}
                     value={montoLitros}
                     onChange={(e) => {
                       setMontoLitros(e.target.value);
@@ -897,7 +904,7 @@ export default function PuntoDeVenta() {
                         const pMayorista = stockConfig?.precio_mayorista ?? producto?.precio_mayorista ?? pMinorista;
 
                         if (litros > 0 && producto) {
-                          const esMayorista = litros >= producto.litros_minimo_mayorista;
+                          const esMayorista = producto.tipo === 'alimento' ? false : litros >= (producto.litros_minimo_mayorista || 0);
                           const precioUnitario = esMayorista ? pMayorista : pMinorista;
                           const total = litros * precioUnitario;
                           const ahorro = esMayorista ? litros * (pMinorista - pMayorista) : 0;
@@ -906,7 +913,7 @@ export default function PuntoDeVenta() {
                             producto: producto.nombre,
                             litros,
                             precio_por_litro: precioUnitario,
-                            tipo_precio: esMayorista ? 'Mayorista' : 'Minorista',
+                            tipo_precio: producto.tipo === 'alimento' ? 'Kg' : (esMayorista ? 'Mayorista' : 'Minorista'),
                             total,
                             ahorro
                           });
@@ -925,7 +932,7 @@ export default function PuntoDeVenta() {
               <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-4">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-2xl font-bold text-green-600">
-                    {resultado.litros} {resultado.isDry ? 'u.' : 'L'}
+                    {resultado.litros} {resultado.isDry ? 'u.' : (productos.find(p => p.id === productoSeleccionado)?.tipo === 'alimento' ? 'kg' : 'L')}
                   </span>
                   <span className={`px-2 py-1 rounded text-xs font-medium ${resultado.tipo_precio === 'Mayorista'
                     ? 'bg-purple-100 text-purple-800'
@@ -935,7 +942,7 @@ export default function PuntoDeVenta() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-600">
-                  ${resultado.precio_por_litro}/{resultado.isDry ? 'u' : 'L'} × {resultado.litros}{resultado.isDry ? 'u' : 'L'}
+                  ${resultado.precio_por_litro}/{resultado.isDry ? 'u' : (productos.find(p => p.id === productoSeleccionado)?.tipo === 'alimento' ? 'kg' : 'L')} × {resultado.litros}{resultado.isDry ? 'u' : (productos.find(p => p.id === productoSeleccionado)?.tipo === 'alimento' ? 'kg' : 'L')}
                 </p>
                 <p className="text-xl font-bold text-gray-800 mt-1">
                   Total: ${resultado.total.toFixed(2)}
