@@ -4,23 +4,41 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { producto_id, monto_pesos } = body;
+    const { producto_id, monto_pesos, sucursal_id } = body;
 
-    // Obtener producto
-    const result = await db.query('SELECT * FROM productos WHERE id = $1', [producto_id]);
-    const producto = result.rows[0];
+    if (!sucursal_id) {
+      return NextResponse.json({ success: false, error: "Sucursal ID es requerido" }, { status: 400 });
+    }
 
-    if (!producto) {
+    // Obtener producto y su configuración en esta sucursal (precio y activo)
+    const result = await db.query(`
+      SELECT p.nombre, p.tipo, p.litros_minimo_mayorista as global_minimo,
+             s.precio_minorista, s.precio_mayorista, s.activo
+      FROM productos p
+      JOIN stock s ON p.id = s.producto_id
+      WHERE p.id = $1 AND s.sucursal_id = $2
+    `, [producto_id, sucursal_id]);
+
+    const item = result.rows[0];
+
+    if (!item) {
       return NextResponse.json({
         success: false,
-        error: "Producto no encontrado"
+        error: "Producto no encontrado en esta sucursal"
       }, { status: 404 });
     }
 
+    if (item.activo === 0) {
+      return NextResponse.json({
+        success: false,
+        error: "Este producto no está disponible en esta sucursal"
+      }, { status: 400 });
+    }
+
     // Paso 1: Calcular litros con precio minorista inicial
-    const precio_minorista = parseFloat(producto.precio_minorista);
-    const precio_mayorista = parseFloat(producto.precio_mayorista);
-    const litros_minimo_mayorista = parseFloat(producto.litros_minimo_mayorista);
+    const precio_minorista = parseFloat(item.precio_minorista);
+    const precio_mayorista = parseFloat(item.precio_mayorista);
+    const litros_minimo_mayorista = parseFloat(item.global_minimo);
 
     let litros = monto_pesos / precio_minorista;
     let precio_final_por_litro = precio_minorista;
@@ -39,7 +57,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      producto: producto.nombre,
+      producto: item.nombre,
       litros: parseFloat(litros.toFixed(2)),
       precio_por_litro: precio_final_por_litro,
       tipo_precio: tipo_precio,

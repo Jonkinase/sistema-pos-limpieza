@@ -18,7 +18,10 @@ export async function GET() {
     const stocksResult = await db.query('SELECT * FROM stock');
     const stocks = stocksResult.rows.map(s => ({
       ...s,
-      cantidad_litros: parseFloat(s.cantidad_litros)
+      cantidad_litros: parseFloat(s.cantidad_litros),
+      precio_minorista: s.precio_minorista ? parseFloat(s.precio_minorista) : null,
+      precio_mayorista: s.precio_mayorista ? parseFloat(s.precio_mayorista) : null,
+      activo: s.activo
     }));
 
     return NextResponse.json(
@@ -45,10 +48,13 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { producto_id, sucursal_id, cantidad_litros } = body as {
+    const { producto_id, sucursal_id, cantidad_litros, precio_minorista, precio_mayorista, activo } = body as {
       producto_id?: number;
       sucursal_id?: number;
       cantidad_litros?: number;
+      precio_minorista?: number;
+      precio_mayorista?: number;
+      activo?: number;
     };
 
     if (!producto_id || !sucursal_id || cantidad_litros === undefined) {
@@ -85,13 +91,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insertar o actualizar stock
+    // Insertar o actualizar stock con precios corregidos
     await db.query(`
-      INSERT INTO stock (producto_id, sucursal_id, cantidad_litros)
-      VALUES ($1, $2, $3)
+      INSERT INTO stock (producto_id, sucursal_id, cantidad_litros, precio_minorista, precio_mayorista, activo)
+      VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT(producto_id, sucursal_id)
-      DO UPDATE SET cantidad_litros = EXCLUDED.cantidad_litros
-    `, [producto_id, sucursal_id, cantidad_litros]);
+      DO UPDATE SET 
+        cantidad_litros = EXCLUDED.cantidad_litros,
+        precio_minorista = COALESCE(EXCLUDED.precio_minorista, stock.precio_minorista),
+        precio_mayorista = COALESCE(EXCLUDED.precio_mayorista, stock.precio_mayorista),
+        activo = COALESCE(EXCLUDED.activo, stock.activo)
+    `, [producto_id, sucursal_id, cantidad_litros, precio_minorista, precio_mayorista, activo]);
 
     const nuevoStockResult = await db.query(
       'SELECT * FROM stock WHERE producto_id = $1 AND sucursal_id = $2',

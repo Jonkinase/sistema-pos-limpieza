@@ -23,6 +23,9 @@ type Stock = {
   producto_id: number;
   sucursal_id: number;
   cantidad_litros: number;
+  precio_minorista: number;
+  precio_mayorista: number;
+  activo: number;
 };
 type ItemCarrito = {
   producto_id: number;
@@ -179,10 +182,13 @@ export default function PuntoDeVenta() {
     return stock?.cantidad_litros ?? 0;
   })();
 
-  // Filtrar productos por búsqueda
-  const productosFiltrados = productos.filter(p =>
-    p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase())
-  );
+  // Filtrar productos por búsqueda y disponibilidad en local
+  const productosFiltrados = productos.filter(p => {
+    const stockConfig = stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada);
+    // Si no hay registro de stock para la sucursal, por defecto está activo pero con stock 0 (solo si es nuevo? no, mejor filtrar si activo === 1)
+    const estaActivo = stockConfig ? stockConfig.activo === 1 : true;
+    return estaActivo && p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase());
+  });
 
   // Obtener stock para cualquier producto en la sucursal actual
   const getStockProducto = (productoId: number) => {
@@ -206,7 +212,8 @@ export default function PuntoDeVenta() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           producto_id: productoSeleccionado,
-          monto_pesos: parseFloat(montoPesos)
+          monto_pesos: parseFloat(montoPesos),
+          sucursal_id: sucursalSeleccionada
         })
       });
 
@@ -241,11 +248,15 @@ export default function PuntoDeVenta() {
       return;
     }
 
-    // Aplicar lógica mayorista/minorista
+    // Aplicar lógica mayorista/minorista usando precios DEL LOCAL
+    const stockConfig = stocks.find(s => s.producto_id === productoSeleccionado && s.sucursal_id === sucursalSeleccionada);
+    const pMinorista = stockConfig?.precio_minorista ?? producto.precio_minorista;
+    const pMayorista = stockConfig?.precio_mayorista ?? producto.precio_mayorista;
+
     const esMayorista = litros >= producto.litros_minimo_mayorista;
-    const precioUnitario = esMayorista ? producto.precio_mayorista : producto.precio_minorista;
+    const precioUnitario = esMayorista ? pMayorista : pMinorista;
     const total = litros * precioUnitario;
-    const ahorroMayorista = esMayorista ? litros * (producto.precio_minorista - producto.precio_mayorista) : 0;
+    const ahorroMayorista = esMayorista ? litros * (pMinorista - pMayorista) : 0;
 
     setResultado({
       success: true,
@@ -562,8 +573,8 @@ export default function PuntoDeVenta() {
                         <div className="text-xs space-y-0.5">
                           <p className="text-gray-500">
                             {p.tipo === 'seco'
-                              ? `$${p.precio_minorista} / u.`
-                              : `$${p.precio_minorista}/L • May: ${p.precio_mayorista}/L`
+                              ? `$${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? p.precio_minorista} / u.`
+                              : `$${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? p.precio_minorista}/L • May: ${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_mayorista ?? p.precio_mayorista}/L`
                             }
                           </p>
                           <p className={`font-medium ${stockProducto > 0 ? 'text-green-600' : 'text-red-500'}`}>
@@ -782,9 +793,9 @@ export default function PuntoDeVenta() {
                           success: true,
                           producto: prod.nombre,
                           litros: qty,
-                          precio_por_litro: prod.precio_minorista,
+                          precio_por_litro: stocks.find(s => s.producto_id === prod.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? prod.precio_minorista,
                           tipo_precio: 'Unidad',
-                          total: qty * prod.precio_minorista,
+                          total: qty * (stocks.find(s => s.producto_id === prod.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? prod.precio_minorista),
                           ahorro: 0,
                           isDry: true
                         });
@@ -847,7 +858,8 @@ export default function PuntoDeVenta() {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                               producto_id: productoSeleccionado,
-                              monto_pesos: monto
+                              monto_pesos: monto,
+                              sucursal_id: sucursalSeleccionada
                             })
                           })
                             .then(res => res.json())
@@ -879,11 +891,16 @@ export default function PuntoDeVenta() {
                       if (e.target.value && productoSeleccionado) {
                         const litros = parseFloat(e.target.value);
                         const producto = productos.find(p => p.id === productoSeleccionado);
+
+                        const stockConfig = stocks.find(s => s.producto_id === productoSeleccionado && s.sucursal_id === sucursalSeleccionada);
+                        const pMinorista = stockConfig?.precio_minorista ?? producto?.precio_minorista ?? 0;
+                        const pMayorista = stockConfig?.precio_mayorista ?? producto?.precio_mayorista ?? pMinorista;
+
                         if (litros > 0 && producto) {
                           const esMayorista = litros >= producto.litros_minimo_mayorista;
-                          const precioUnitario = esMayorista ? producto.precio_mayorista : producto.precio_minorista;
+                          const precioUnitario = esMayorista ? pMayorista : pMinorista;
                           const total = litros * precioUnitario;
-                          const ahorro = esMayorista ? litros * (producto.precio_minorista - producto.precio_mayorista) : 0;
+                          const ahorro = esMayorista ? litros * (pMinorista - pMayorista) : 0;
                           setResultado({
                             success: true,
                             producto: producto.nombre,

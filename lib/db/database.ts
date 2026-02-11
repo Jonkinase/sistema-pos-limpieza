@@ -50,6 +50,9 @@ export async function initDatabase() {
         producto_id INTEGER NOT NULL REFERENCES productos(id),
         sucursal_id INTEGER NOT NULL REFERENCES sucursales(id),
         cantidad_litros DECIMAL(12, 2) DEFAULT 0,
+        precio_minorista DECIMAL(12, 2),
+        precio_mayorista DECIMAL(12, 2),
+        activo INTEGER DEFAULT 1,
         UNIQUE(producto_id, sucursal_id)
       )
     `);
@@ -160,6 +163,29 @@ export async function initDatabase() {
       await client.query('ALTER TABLE presupuestos ADD CONSTRAINT presupuestos_venta_id_fkey FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE SET NULL');
     } catch (e) {
       console.log('⚠️ Nota: No se pudo actualizar la constraint de presupuestos (puede que ya esté bien o la tabla no exista aún)');
+    }
+
+    // MIGRACIÓN: Descentralización de Inventario (Precios y Activo por Local)
+    try {
+      // 1. Añadir columnas a la tabla stock si no existen
+      await client.query('ALTER TABLE stock ADD COLUMN IF NOT EXISTS precio_minorista DECIMAL(12, 2)');
+      await client.query('ALTER TABLE stock ADD COLUMN IF NOT EXISTS precio_mayorista DECIMAL(12, 2)');
+      await client.query('ALTER TABLE stock ADD COLUMN IF NOT EXISTS activo INTEGER DEFAULT 1');
+
+      // 2. Poblar columnas con valores actuales de la tabla productos para registros que no tengan precio
+      await client.query(`
+        UPDATE stock s
+        SET 
+          precio_minorista = p.precio_minorista,
+          precio_mayorista = p.precio_mayorista,
+          activo = p.activo
+        FROM productos p
+        WHERE s.producto_id = p.id
+        AND s.precio_minorista IS NULL
+      `);
+      console.log('✅ Migración de inventario descentralizado completada');
+    } catch (e) {
+      console.error('❌ Error en migración de inventario descentralizado:', e);
     }
 
     // Insertar sucursales iniciales

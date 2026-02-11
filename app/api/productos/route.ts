@@ -63,7 +63,10 @@ export async function POST(request: Request) {
 
     for (const sucursal of sucursales) {
       const cantidad = (stock_inicial && sucursal_id === sucursal.id) ? parseFloat(stock_inicial) : 0;
-      await db.query('INSERT INTO stock (producto_id, sucursal_id, cantidad_litros) VALUES ($1, $2, $3)', [newProductId, sucursal.id, cantidad]);
+      await db.query(`
+        INSERT INTO stock (producto_id, sucursal_id, cantidad_litros, precio_minorista, precio_mayorista, activo) 
+        VALUES ($1, $2, $3, $4, $5, 1)
+      `, [newProductId, sucursal.id, cantidad, precio_minorista, pMayorista]);
     }
 
     return NextResponse.json({
@@ -86,23 +89,29 @@ export async function PUT(request: Request) {
     const body = await request.json();
     const { id, nombre, tipo, precio_minorista, precio_mayorista, litros_minimo_mayorista } = body;
 
-    if (!id || !nombre || !precio_minorista) {
-      return NextResponse.json({ success: false, error: "ID, Nombre y Precio son obligatorios" }, { status: 400 });
+    if (!id || !nombre) {
+      return NextResponse.json({ success: false, error: "ID y Nombre son obligatorios" }, { status: 400 });
     }
 
-    const tipoProducto = tipo || 'liquido';
-    const pMayorista = tipoProducto === 'seco' ? precio_minorista : (precio_mayorista || precio_minorista);
-    const lMinimos = tipoProducto === 'seco' ? 0 : (litros_minimo_mayorista || 5);
+    // Obtener valores actuales para completar lo que falte
+    const currentProductResult = await db.query('SELECT * FROM productos WHERE id = $1', [id]);
+    const currentProduct = currentProductResult.rows[0];
 
-    const result = await db.query(`
+    if (!currentProduct) {
+      return NextResponse.json({ success: false, error: "Producto no encontrado" }, { status: 404 });
+    }
+
+    const nombreFinal = nombre || currentProduct.nombre;
+    const tipoProducto = tipo || currentProduct.tipo || 'liquido';
+    const pMinoristaFinal = precio_minorista !== undefined ? precio_minorista : currentProduct.precio_minorista;
+    const pMayoristaFinal = precio_mayorista !== undefined ? precio_mayorista : (precio_minorista !== undefined ? precio_minorista : currentProduct.precio_mayorista);
+    const lMinimosFinal = litros_minimo_mayorista !== undefined ? litros_minimo_mayorista : currentProduct.litros_minimo_mayorista;
+
+    await db.query(`
       UPDATE productos 
       SET nombre = $1, tipo = $2, precio_minorista = $3, precio_mayorista = $4, litros_minimo_mayorista = $5
       WHERE id = $6
-    `, [nombre, tipoProducto, precio_minorista, pMayorista, lMinimos, id]);
-
-    if (result.rowCount === 0) {
-      return NextResponse.json({ success: false, error: "Producto no encontrado" }, { status: 404 });
-    }
+    `, [nombreFinal, tipoProducto, pMinoristaFinal, pMayoristaFinal, lMinimosFinal, id]);
 
     return NextResponse.json({
       success: true,

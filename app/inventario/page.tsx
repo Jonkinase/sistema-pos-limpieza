@@ -20,6 +20,9 @@ type Stock = {
   producto_id: number;
   sucursal_id: number;
   cantidad_litros: number;
+  precio_minorista: number;
+  precio_mayorista: number;
+  activo: number;
 };
 
 export default function InventarioPage() {
@@ -93,11 +96,10 @@ export default function InventarioPage() {
       });
   }, []);
 
-  const obtenerStock = (producto_id: number, sucursal_id: number) => {
-    const row = stocks.find(
+  const obtenerConfiguracionSucursal = (producto_id: number, sucursal_id: number) => {
+    return stocks.find(
       (s) => s.producto_id === producto_id && s.sucursal_id === sucursal_id
     );
-    return row?.cantidad_litros ?? 0;
   };
 
   const cambiarStockLocal = (producto_id: number, sucursal_id: number, valor: number) => {
@@ -125,7 +127,8 @@ export default function InventarioPage() {
   };
 
   const guardarStock = async (producto_id: number, sucursal_id: number) => {
-    const cantidad = obtenerStock(producto_id, sucursal_id);
+    const config = obtenerConfiguracionSucursal(producto_id, sucursal_id);
+    const cantidad = config?.cantidad_litros ?? 0;
     setGuardando(true);
     setMensaje(null);
     try {
@@ -177,34 +180,34 @@ export default function InventarioPage() {
   const [formProducto, setFormProducto] = useState({
     nombre: '',
     tipo: 'liquido',
-    precio_minorista: '',
-    precio_mayorista: '',
     litros_minimo_mayorista: '5',
-    stock_actual: '' // Solo usado para editar stock
+    stock_actual: '', // Solo usado para editar stock
+    activo: 1
   });
 
   const abrirModalCrear = () => {
     setFormProducto({
       nombre: '',
       tipo: 'liquido',
-      precio_minorista: '',
       precio_mayorista: '',
       litros_minimo_mayorista: '5',
-      stock_actual: '0'
+      stock_actual: '0',
+      activo: 1
     });
     setModalCrearAbierto(true);
   };
 
   const abrirModalEditar = (producto: any) => {
-    const stock = obtenerStock(producto.id, sucursalSeleccionada!);
+    const config = obtenerConfiguracionSucursal(producto.id, sucursalSeleccionada!);
     setProductoEditando(producto);
     setFormProducto({
       nombre: producto.nombre,
       tipo: producto.tipo || 'liquido',
-      precio_minorista: producto.precio_minorista.toString(),
-      precio_mayorista: producto.precio_mayorista?.toString() || '',
+      precio_minorista: (config?.precio_minorista ?? producto.precio_minorista).toString(),
+      precio_mayorista: (config?.precio_mayorista ?? producto.precio_mayorista)?.toString() || '',
       litros_minimo_mayorista: producto.litros_minimo_mayorista?.toString() || '5',
-      stock_actual: stock.toString()
+      stock_actual: (config?.cantidad_litros ?? 0).toString(),
+      activo: config?.activo ?? 1
     });
     setModalEditarAbierto(true);
   };
@@ -259,30 +262,30 @@ export default function InventarioPage() {
           id: productoEditando.id,
           nombre: formProducto.nombre,
           tipo: formProducto.tipo,
-          precio_minorista: parseFloat(formProducto.precio_minorista),
-          precio_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : null,
           litros_minimo_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.litros_minimo_mayorista) : null
         })
       });
 
-      // 2. Actualizar Stock si cambió
-      const nuevoStock = parseFloat(formProducto.stock_actual);
-      const stockActual = obtenerStock(productoEditando.id, sucursalSeleccionada);
+      // 2. Actualizar Configuración por Sucursal (Stock, Precios, Activo)
+      const nuevaCantidad = parseFloat(formProducto.stock_actual);
+      const nuevoPrecioMin = parseFloat(formProducto.precio_minorista);
+      const nuevoPrecioMay = formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : nuevoPrecioMin;
+      const nuevoActivo = formProducto.activo;
 
-      let stockOk = true;
-      if (!isNaN(nuevoStock) && nuevoStock !== stockActual) {
-        const resStock = await fetch('/api/stock', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            producto_id: productoEditando.id,
-            sucursal_id: sucursalSeleccionada,
-            cantidad_litros: nuevoStock,
-          }),
-        });
-        const dataStock = await resStock.json();
-        if (!dataStock.success) stockOk = false;
-      }
+      const resStock = await fetch('/api/stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          producto_id: productoEditando.id,
+          sucursal_id: sucursalSeleccionada,
+          cantidad_litros: nuevaCantidad,
+          precio_minorista: nuevoPrecioMin,
+          precio_mayorista: nuevoPrecioMay,
+          activo: nuevoActivo
+        }),
+      });
+      const dataStock = await resStock.json();
+      const stockOk = dataStock.success;
 
       const dataProd = await resProd.json();
 
@@ -485,7 +488,16 @@ export default function InventarioPage() {
                     Tipo
                   </th>
                   <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 border-b">
+                    P. Minorista
+                  </th>
+                  <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 border-b">
+                    P. Mayorista
+                  </th>
+                  <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 border-b">
                     Stock
+                  </th>
+                  <th className="px-4 py-2 text-center text-sm font-semibold text-gray-700 border-b">
+                    Estado
                   </th>
                   <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 border-b">
                     Acción
@@ -500,19 +512,35 @@ export default function InventarioPage() {
                   <tr><td colSpan={4} className="text-center py-4">No hay productos</td></tr>
                 ) : (
                   productosFiltrados.map((producto: any) => {
-                    const actual = obtenerStock(producto.id, sucursalSeleccionada);
+                    const config = obtenerConfiguracionSucursal(producto.id, sucursalSeleccionada);
+                    const actual = config?.cantidad_litros ?? 0;
+                    const pMinorista = config?.precio_minorista ?? producto.precio_minorista;
+                    const pMayorista = config?.precio_mayorista ?? producto.precio_mayorista;
+                    const estaActivo = config ? config.activo === 1 : true;
+
                     return (
-                      <tr key={producto.id} className="hover:bg-gray-50">
+                      <tr key={producto.id} className={`hover:bg-gray-50 ${!estaActivo ? 'opacity-50 grayscale' : ''}`}>
                         <td className="px-4 py-2 text-sm text-gray-800 border-b font-medium">
                           {producto.nombre}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-600 border-b capitalize">
                           {producto.tipo || 'Líquido'}
                         </td>
+                        <td className="px-4 py-2 text-sm text-right border-b font-bold text-gray-700">
+                          ${Number(pMinorista).toFixed(2)}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-right border-b font-bold text-gray-700">
+                          ${pMayorista ? Number(pMayorista).toFixed(2) : '-'}
+                        </td>
                         <td className="px-4 py-2 text-sm text-right border-b font-bold text-emerald-700">
                           {producto.tipo === 'seco' ? Math.floor(Number(actual)) : Number(actual).toFixed(2)}
                           <span className="text-gray-400 text-xs ml-1 font-normal">
                             {producto.tipo === 'seco' ? 'u.' : 'L'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-sm text-center border-b">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${estaActivo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                            {estaActivo ? 'Activo' : 'Inactivo'}
                           </span>
                         </td>
                         <td className="px-4 py-2 text-sm text-right border-b">
@@ -602,7 +630,7 @@ export default function InventarioPage() {
                       type="number"
                       step={formProducto.tipo === 'seco' ? "1" : "0.01"}
                       className="w-full p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-lg font-bold text-right text-gray-900"
-                      value={formProducto.stock_actual}
+                      value={formProducto.stock_actual || ''}
                       onChange={e => setFormProducto({ ...formProducto, stock_actual: e.target.value })}
                     />
                     <span className="text-gray-500 font-bold">
@@ -619,7 +647,7 @@ export default function InventarioPage() {
                       <input
                         type="number"
                         className="w-full pl-7 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
-                        value={formProducto.precio_minorista}
+                        value={formProducto.precio_minorista || ''}
                         onChange={e => setFormProducto({ ...formProducto, precio_minorista: e.target.value })}
                         placeholder="0.00"
                       />
@@ -634,7 +662,7 @@ export default function InventarioPage() {
                         <input
                           type="number"
                           className="w-full pl-7 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
-                          value={formProducto.precio_mayorista}
+                          value={formProducto.precio_mayorista || ''}
                           onChange={e => setFormProducto({ ...formProducto, precio_mayorista: e.target.value })}
                           placeholder="0.00"
                         />
@@ -643,13 +671,30 @@ export default function InventarioPage() {
                   )}
                 </div>
 
+                {/* Toggle de Activo (Solo Admin) */}
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                  <span className="text-sm font-medium text-gray-700">Habilitar en este local</span>
+                  <button
+                    onClick={() => {
+                      if (user?.rol === 'admin') {
+                        setFormProducto({ ...formProducto, activo: formProducto.activo === 1 ? 0 : 1 });
+                      } else {
+                        alert('Solo los administradores pueden cambiar la disponibilidad de productos en el local.');
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formProducto.activo === 1 ? 'bg-emerald-500' : 'bg-gray-300'} ${user?.rol !== 'admin' ? 'cursor-not-allowed opacity-70' : ''}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formProducto.activo === 1 ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
                 {formProducto.tipo === 'liquido' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Mínimo para Mayorista (Litros)</label>
                     <input
                       type="number"
                       className="w-full mt-1 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
-                      value={formProducto.litros_minimo_mayorista}
+                      value={formProducto.litros_minimo_mayorista || ''}
                       onChange={e => setFormProducto({ ...formProducto, litros_minimo_mayorista: e.target.value })}
                     />
                   </div>
