@@ -131,12 +131,12 @@ export async function GET(request: Request) {
         (SELECT COUNT(*) FROM detalle_ventas WHERE venta_id = v.id) as items_count,
         (SELECT STRING_AGG(COALESCE(dv.producto_nombre, p.nombre) || ' (' || 
           CASE 
-            WHEN p.tipo = 'seco' OR dv.producto_id IS NULL THEN CAST(dv.cantidad_litros AS INT) || 'u.' 
+            WHEN dv.producto_id IS NULL OR p.tipo = 'seco' THEN CAST(dv.cantidad_litros AS INT) || 'u.' 
             WHEN p.tipo = 'alimento' THEN dv.cantidad_litros || 'kg'
             ELSE dv.cantidad_litros || 'L' 
           END || ')', ', ') 
          FROM detalle_ventas dv 
-         JOIN productos p ON dv.producto_id = p.id 
+         LEFT JOIN productos p ON dv.producto_id = p.id 
          WHERE dv.venta_id = v.id) as items_resumen
       FROM ventas v
       JOIN sucursales s ON v.sucursal_id = s.id

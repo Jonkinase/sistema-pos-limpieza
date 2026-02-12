@@ -198,7 +198,7 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                             <h4 className="font-bold text-gray-700 mb-2 text-sm uppercase">Items</h4>
                             <div className="bg-white border rounded-lg p-3 max-h-40 overflow-y-auto">
                                 <div className="text-sm text-gray-600 whitespace-pre-wrap">
-                                    {selectedSale.items_resumen.split(', ').map((item, i) => (
+                                    {(selectedSale.items_resumen || '').split(', ').map((item, i) => (
                                         <div key={i} className="py-1 border-b last:border-0 border-gray-100">
                                             • {item}
                                         </div>
