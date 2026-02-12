@@ -121,6 +121,8 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const sucursalId = searchParams.get('sucursal_id');
+    const fechaDesde = searchParams.get('fecha_desde');
+    const fechaHasta = searchParams.get('fecha_hasta');
 
     let queryStr = `
       SELECT 
@@ -142,13 +144,24 @@ export async function GET(request: Request) {
       JOIN sucursales s ON v.sucursal_id = s.id
       LEFT JOIN clientes c ON v.cliente_id = c.id
       LEFT JOIN usuarios u ON v.usuario_id = u.id
+      WHERE 1=1
     `;
 
-    const params = [];
+    const params: any[] = [];
 
     if (sucursalId) {
-      queryStr += ` WHERE v.sucursal_id = $1`;
       params.push(sucursalId);
+      queryStr += ` AND v.sucursal_id = $${params.length}`;
+    }
+
+    if (fechaDesde) {
+      params.push(`${fechaDesde} 00:00:00`);
+      queryStr += ` AND v.fecha >= $${params.length}`;
+    }
+
+    if (fechaHasta) {
+      params.push(`${fechaHasta} 23:59:59`);
+      queryStr += ` AND v.fecha <= $${params.length}`;
     }
 
     queryStr += ` ORDER BY v.fecha DESC LIMIT 50`;

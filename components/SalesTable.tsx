@@ -28,12 +28,17 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
     const [loading, setLoading] = useState(false);
     const [selectedSale, setSelectedSale] = useState<Venta | null>(null);
 
+    // Filtros de fecha (valor por defecto: hoy)
+    const today = new Date().toISOString().split('T')[0];
+    const [fechaDesde, setFechaDesde] = useState(today);
+    const [fechaHasta, setFechaHasta] = useState(today);
+
     // ... (useEffect remains same) ...
     useEffect(() => {
         if (!sucursalId) return;
 
         setLoading(true);
-        fetch(`/api/ventas?sucursal_id=${sucursalId}`)
+        fetch(`/api/ventas?sucursal_id=${sucursalId}&fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}`)
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
@@ -41,7 +46,7 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                 }
             })
             .finally(() => setLoading(false));
-    }, [sucursalId, refreshTrigger]);
+    }, [sucursalId, refreshTrigger, fechaDesde, fechaHasta]);
 
     // Eliminar venta
     const handleDelete = async (venta: Venta) => {
@@ -70,10 +75,42 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
     };
 
     return (
-        <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                📋 Historial de Ventas - {ventas.length > 0 ? 'Últimos movimientos' : 'Sin ventas'}
-            </h2>
+        <div className="bg-white rounded-2xl shadow-lg p-6 mt-6 text-black">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                <h2 className="text-2xl font-bold text-black">
+                    📋 Historial de Ventas - {ventas.length > 0 ? 'Movimientos' : 'Sin ventas'}
+                </h2>
+
+                <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <div className="flex items-center gap-2">
+                        <label className="text-xs font-bold text-black uppercase">Desde:</label>
+                        <input
+                            type="date"
+                            value={fechaDesde}
+                            onChange={(e) => setFechaDesde(e.target.value)}
+                            className="text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5 text-black bg-white"
+                        />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="text-xs font-bold text-black uppercase">Hasta:</label>
+                        <input
+                            type="date"
+                            value={fechaHasta}
+                            onChange={(e) => setFechaHasta(e.target.value)}
+                            className="text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5 text-black bg-white"
+                        />
+                    </div>
+                    <button
+                        onClick={() => {
+                            setFechaDesde(today);
+                            setFechaHasta(today);
+                        }}
+                        className="text-xs bg-white hover:bg-gray-100 text-black font-bold py-1.5 px-3 rounded-lg border border-gray-200 transition"
+                    >
+                        Hoy
+                    </button>
+                </div>
+            </div>
 
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
@@ -103,13 +140,13 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                                     <td className="px-4 py-3">
                                         <span className="font-bold text-blue-600">#{venta.id}</span>
                                         <br />
-                                        <span className="text-gray-500 text-xs">
+                                        <span className="text-black text-xs">
                                             {new Date(venta.fecha).toLocaleString()}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3">
                                         {venta.cliente_nombre || (
-                                            <span className="text-gray-400 italic">Consumidor Final</span>
+                                            <span className="text-black italic">Consumidor Final</span>
                                         )}
                                         {venta.tipo_venta === 'fiado' && (
                                             <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-800 border border-orange-200">
@@ -120,10 +157,10 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                                     <td className="px-4 py-3">
                                         {venta.vendedor_nombre || '-'}
                                     </td>
-                                    <td className="px-4 py-3 text-gray-600 truncate max-w-[200px]" title={venta.items_resumen}>
+                                    <td className="px-4 py-3 text-black truncate max-w-[200px]" title={venta.items_resumen}>
                                         {venta.items_resumen}
                                     </td>
-                                    <td className="px-4 py-3 text-right font-bold text-gray-800">
+                                    <td className="px-4 py-3 text-right font-bold text-black">
                                         ${venta.total.toFixed(2)}
                                     </td>
                                     <td className="px-4 py-3 flex justify-center gap-2">
@@ -208,7 +245,7 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                         </div>
 
                         <div className="flex justify-between items-center mb-6 pt-4 border-t">
-                            <span className="font-bold text-xl">Total</span>
+                            <span className="font-bold text-xl text-black">Total</span>
                             <span className="font-bold text-2xl text-blue-600">${selectedSale.total.toFixed(2)}</span>
                         </div>
 
