@@ -137,8 +137,8 @@ export default function UsuariosPage() {
     return (
         <div className="min-h-screen bg-gray-100 p-6">
             <div className="max-w-5xl mx-auto">
-                <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-3xl font-bold text-gray-800">👥 Gestión de Usuarios</h1>
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-6">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">👥 Gestión de Usuarios</h1>
                     <Link
                         href="/"
                         className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"
@@ -158,7 +158,7 @@ export default function UsuariosPage() {
                                 <input
                                     type="text"
                                     required
-                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-base text-gray-900"
                                     value={nombre}
                                     onChange={e => setNombre(e.target.value)}
                                 />
@@ -168,7 +168,7 @@ export default function UsuariosPage() {
                                 <input
                                     type="email"
                                     required
-                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-base text-gray-900"
                                     value={email}
                                     onChange={e => setEmail(e.target.value)}
                                 />
@@ -179,7 +179,7 @@ export default function UsuariosPage() {
                                     type="password"
                                     required
                                     minLength={4}
-                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-base text-gray-900"
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
                                 />
@@ -187,7 +187,7 @@ export default function UsuariosPage() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Rol</label>
                                 <select
-                                    className="w-full mt-1 p-2 border rounded-lg bg-white text-gray-900"
+                                    className="w-full mt-1 p-2 border rounded-lg bg-white text-base text-gray-900"
                                     value={rol}
                                     onChange={e => setRol(e.target.value)}
                                 >
@@ -207,7 +207,7 @@ export default function UsuariosPage() {
                                     <select
                                         required
                                         disabled={user?.rol === 'encargado'}
-                                        className={`w-full mt-1 p-2 border-2 border-orange-200 rounded-lg bg-orange-50 text-gray-900 ${user?.rol === 'encargado' ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                        className={`w-full mt-1 p-2 border-2 border-orange-200 rounded-lg bg-orange-50 text-base text-gray-900 ${user?.rol === 'encargado' ? 'opacity-70 cursor-not-allowed' : ''}`}
                                         value={user?.rol === 'encargado' ? user.sucursal_id : sucursalId}
                                         onChange={e => setSucursalId(e.target.value)}
                                     >
@@ -235,7 +235,36 @@ export default function UsuariosPage() {
                     {/* Lista de Usuarios */}
                     <div className="lg:col-span-2 bg-white rounded-xl shadow-md p-6">
                         <h2 className="text-xl font-bold text-gray-700 mb-4">Usuarios Registrados</h2>
-                        <div className="overflow-x-auto">
+                        <div className="md:hidden space-y-3">
+                            {usuarios.map(u => (
+                                <div key={u.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                    <div className="mb-2">
+                                        <p className="font-bold text-gray-900">{u.nombre}</p>
+                                        <p className="text-sm text-gray-500">{u.email}</p>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2 mb-3">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${u.rol === 'admin'
+                                            ? 'bg-purple-100 text-purple-700'
+                                            : 'bg-blue-100 text-blue-700'
+                                            }`}>
+                                            {u.rol === 'admin' ? 'Administrador' : u.rol === 'encargado' ? 'Encargado' : 'Vendedor'}
+                                        </span>
+                                        <span className="text-sm text-gray-600">{u.sucursal_nombre || '-'}</span>
+                                    </div>
+                                    <div className="pt-2 border-t border-gray-200">
+                                        <button
+                                            onClick={() => handleDelete(u.id)}
+                                            className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded transition-colors"
+                                            title="Eliminar usuario"
+                                        >
+                                            🗑️ Eliminar
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
                                     <tr>

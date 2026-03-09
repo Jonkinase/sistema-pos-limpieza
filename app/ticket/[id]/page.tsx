@@ -72,7 +72,7 @@ export default function TicketPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white shadow-lg rounded-lg p-4 w-full max-w-sm ticket-print">
+      <div className="bg-white shadow-lg rounded-lg w-full max-w-sm mx-auto p-4 ticket-print">
         {cargando ? (
           <div className="text-center text-gray-600">Cargando ticket...</div>
         ) : error ? (
@@ -90,7 +90,7 @@ export default function TicketPage() {
               <p className="text-xs text-gray-600">
                 Sucursal: {venta.sucursal_nombre}
               </p>
-              <p className="text-[10px] text-gray-500">
+              <p className="text-xs print:text-[10px] text-gray-500">
                 Ticket #{venta.id} · {fechaFormateada}
               </p>
             </div>
@@ -119,7 +119,7 @@ export default function TicketPage() {
                       ${item.subtotal.toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between text-[10px] text-gray-600">
+                  <div className="flex justify-between text-xs print:text-[10px] text-gray-600">
                     <span>
                       {item.producto_tipo === 'seco' || !item.producto_tipo
                         ? `${Math.floor(item.cantidad_litros)} u. x $${item.precio_unitario.toFixed(2)}`
@@ -153,19 +153,19 @@ export default function TicketPage() {
                   </span>
                 </div>
               )}
-              <div className="mt-1 text-[10px] text-gray-500">
+              <div className="mt-1 text-xs print:text-[10px] text-gray-500">
                 Tipo: {venta.tipo_venta === 'fiado' ? 'FIADO' : 'CONTADO'}
               </div>
             </div>
 
-            <div className="text-center text-[10px] text-gray-500 mt-2 border-t border-dashed pt-2">
+            <div className="text-center text-xs print:text-[10px] text-gray-500 mt-2 border-t border-dashed pt-2">
               ¡Gracias por su compra!
             </div>
 
             <div className="mt-4 flex justify-between gap-2 no-print">
               <button
                 onClick={imprimir}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-3 rounded-lg text-xs"
+                className="flex-1 w-full sm:w-auto min-h-[44px] bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-3 rounded-lg text-xs"
               >
                 Imprimir
               </button>
@@ -199,4 +199,3 @@ export default function TicketPage() {
     </div>
   );
 }
-

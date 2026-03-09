@@ -468,7 +468,7 @@ export default function PuntoDeVenta() {
 
         {/* Header Compacto */}
         <div className="bg-white rounded-2xl shadow-lg p-4 mb-4">
-          <div className="flex justify-between items-center gap-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
             {/* Título y navegación */}
             <div className="flex items-center gap-4 flex-wrap">
               <h1 className="text-2xl font-bold text-blue-600">
@@ -521,7 +521,7 @@ export default function PuntoDeVenta() {
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-gray-500">📍</span>
                 <select
-                  className={`bg-gray-100 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-blue-500 text-gray-900 ${user?.rol !== 'admin' ? 'opacity-70 pointer-events-none bg-gray-200' : ''}`}
+                  className={`bg-gray-100 border border-gray-300 rounded-lg px-2 py-1 text-base focus:outline-none focus:border-blue-500 text-gray-900 ${user?.rol !== 'admin' ? 'opacity-70 pointer-events-none bg-gray-200' : ''}`}
                   value={sucursalSeleccionada ?? ''}
                   onChange={(e) => setSucursalSeleccionada(Number(e.target.value))}
                   disabled={user?.rol !== 'admin' || sucursalSeleccionada === null}
@@ -573,7 +573,7 @@ export default function PuntoDeVenta() {
               </span>
               <input
                 type="text"
-                className="w-full p-2 pl-10 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-gray-900"
+                className="w-full p-2 pl-10 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-base text-gray-900"
                 placeholder="Buscar producto..."
                 value={busquedaProducto}
                 onChange={(e) => setBusquedaProducto(e.target.value)}
@@ -595,7 +595,7 @@ export default function PuntoDeVenta() {
                   {busquedaProducto ? 'No se encontraron productos' : 'Cargando productos...'}
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {productosFiltrados.map(p => {
                     const stockProducto = getStockProducto(p.id);
                     return (
@@ -636,7 +636,7 @@ export default function PuntoDeVenta() {
             </h2>
 
             {idVentaEditando && (
-              <div className="mb-4 p-3 bg-orange-100 border-l-4 border-orange-500 text-orange-800 flex justify-between items-center rounded-r-lg">
+              <div className="mb-4 p-3 bg-orange-100 border-l-4 border-orange-500 text-orange-800 flex flex-col md:flex-row gap-4 md:justify-between md:items-center rounded-r-lg">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">✏️</span>
                   <div>
@@ -688,7 +688,7 @@ export default function PuntoDeVenta() {
                         👤 Cliente:
                       </label>
                       <select
-                        className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+                        className="w-full p-2 border border-gray-300 rounded-lg text-base bg-white text-gray-900"
                         value={clienteSeleccionado ?? ''}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -718,7 +718,7 @@ export default function PuntoDeVenta() {
                             value="contado"
                             checked={tipoVenta === 'contado'}
                             onChange={() => setTipoVenta('contado')}
-                            className="w-4 h-4 text-blue-600"
+                            className="w-4 h-4 text-base text-blue-600"
                           />
                           Contado
                         </label>
@@ -730,7 +730,7 @@ export default function PuntoDeVenta() {
                             checked={tipoVenta === 'fiado'}
                             disabled={clienteSeleccionado === null}
                             onChange={() => setTipoVenta('fiado')}
-                            className="w-4 h-4 text-blue-600"
+                            className="w-4 h-4 text-base text-blue-600"
                           />
                           Fiado
                         </label>
@@ -738,9 +738,9 @@ export default function PuntoDeVenta() {
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col md:flex-row gap-4 md:justify-between md:items-center">
                     <span className="text-2xl font-bold text-gray-800">TOTAL:</span>
-                    <span className="text-3xl font-bold text-blue-600">
+                    <span className="text-2xl sm:text-3xl font-bold text-blue-600">
                       ${totalCarrito.toFixed(2)}
                     </span>
                   </div>
@@ -748,21 +748,21 @@ export default function PuntoDeVenta() {
 
                 <button
                   onClick={guardarPresupuesto}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg mb-3"
+                  className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg mb-3"
                 >
                   📄 Guardar como Presupuesto
                 </button>
 
                 <button
                   onClick={finalizarVenta}
-                  className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-lg text-xl"
+                  className="w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-lg text-xl"
                 >
                   ✅ Finalizar Venta
                 </button>
 
                 <button
                   onClick={() => setCarrito([])}
-                  className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg mt-3"
+                  className="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg mt-3"
                 >
                   🗑️ Vaciar Carrito
                 </button>
@@ -822,7 +822,7 @@ export default function PuntoDeVenta() {
                   type="number"
                   step="1"
                   autoFocus
-                  className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none text-gray-900"
+                  className="w-full p-3 text-base text-center border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none text-gray-900"
                   placeholder="Ej: 1"
                   value={montoLitros} // Reusing montoLitros for convenience, logically it's qty
                   onChange={(e) => {
@@ -886,7 +886,7 @@ export default function PuntoDeVenta() {
                   <input
                     type="number"
                     autoFocus
-                    className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-gray-900"
+                    className="w-full p-3 text-base text-center border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-gray-900"
                     placeholder="Ej: 1000"
                     value={montoPesos}
                     onChange={(e) => {
@@ -924,7 +924,7 @@ export default function PuntoDeVenta() {
                     type="number"
                     step={productos.find(p => p.id === productoSeleccionado)?.tipo === 'alimento' ? "0.1" : "0.5"}
                     autoFocus
-                    className="w-full p-3 text-xl text-center border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-gray-900"
+                    className="w-full p-3 text-base text-center border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-gray-900"
                     placeholder={productos.find(p => p.id === productoSeleccionado)?.tipo === 'alimento' ? "Ej: 1" : "Ej: 5"}
                     value={montoLitros}
                     onChange={(e) => {
@@ -994,7 +994,7 @@ export default function PuntoDeVenta() {
             <button
               onClick={agregarAlCarrito}
               disabled={!resultado}
-              className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-bold py-3 px-6 rounded-lg text-lg transition-all"
+              className="w-full sm:w-auto bg-green-500 hover:bg-green-600 disabled:bg-gray-300 text-white font-bold py-3 px-6 rounded-lg text-lg transition-all"
             >
               ➕ Agregar al Carrito
             </button>
@@ -1019,7 +1019,7 @@ export default function PuntoDeVenta() {
                 <input
                   autoFocus
                   type="text"
-                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900 focus:border-blue-500"
+                  className="w-full p-2 border border-gray-300 rounded-lg text-base text-gray-900 focus:border-blue-500"
                   placeholder="Ej: Diferencia por vuelto"
                   value={nombreItemRapido}
                   onChange={(e) => setNombreItemRapido(e.target.value)}
@@ -1029,7 +1029,7 @@ export default function PuntoDeVenta() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Precio ($):</label>
                 <input
                   type="number"
-                  className="w-full p-2 border border-gray-300 rounded-lg text-gray-900 focus:border-blue-500"
+                  className="w-full p-2 border border-gray-300 rounded-lg text-base text-gray-900 focus:border-blue-500"
                   placeholder="0.00"
                   value={precioItemRapido}
                   onChange={(e) => setPrecioItemRapido(e.target.value)}
@@ -1037,7 +1037,7 @@ export default function PuntoDeVenta() {
               </div>
               <button
                 onClick={agregarItemRapido}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition mt-2"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition mt-2"
               >
                 ➕ Agregar al Carrito
               </button>

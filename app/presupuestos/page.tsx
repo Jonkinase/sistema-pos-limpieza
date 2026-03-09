@@ -248,9 +248,9 @@ export default function PresupuestosPage() {
 
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
             <div>
-              <h1 className="text-4xl font-bold text-orange-600 mb-2">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-orange-600 mb-2">
                 📄 Presupuestos
               </h1>
               <p className="text-gray-600">Gestión de presupuestos y cotizaciones</p>
@@ -260,7 +260,7 @@ export default function PresupuestosPage() {
                 <div className="flex items-center gap-2 bg-purple-50 p-2 rounded-lg border border-purple-200">
                   <span className="text-sm font-medium text-purple-700">📍 Sucursal:</span>
                   <select
-                    className="bg-white border-2 border-purple-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:border-purple-500 text-gray-900"
+                    className="bg-white border-2 border-purple-300 rounded-lg px-3 py-1 text-base focus:outline-none focus:border-purple-500 text-gray-900"
                     value={sucursalSeleccionada}
                     onChange={(e) => setSucursalSeleccionada(Number(e.target.value))}
                   >
@@ -299,7 +299,7 @@ export default function PresupuestosPage() {
                   key={presupuesto.id}
                   className="bg-gray-50 p-5 rounded-lg border-2 border-gray-200 hover:border-orange-300 transition-all"
                 >
-                  <div className="flex justify-between items-start">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <span className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold">
@@ -325,7 +325,7 @@ export default function PresupuestosPage() {
                     <div className="flex flex-col gap-2">
                       <button
                         onClick={() => generarPDF(presupuesto.id)}
-                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap"
+                        className="w-full sm:w-auto min-h-[44px] bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap"
                       >
                         📄 Descargar PDF
                       </button>
@@ -334,13 +334,13 @@ export default function PresupuestosPage() {
                         <>
                           <button
                             onClick={() => convertirAVenta(presupuesto.id)}
-                            className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap"
+                            className="w-full sm:w-auto min-h-[44px] bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap"
                           >
                             ✅ Convertir a Venta
                           </button>
                           <button
                             onClick={() => eliminarPresupuesto(presupuesto.id)}
-                            className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap"
+                            className="w-full sm:w-auto min-h-[44px] bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap"
                           >
                             🗑️ Eliminar
                           </button>

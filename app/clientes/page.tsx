@@ -201,9 +201,9 @@ export default function ClientesPage() {
 
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="flex justify-between items-center gap-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
             <div>
-              <h1 className="text-4xl font-bold text-purple-600 mb-2">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-purple-600 mb-2">
                 💳 Cuentas Corrientes
               </h1>
               <p className="text-gray-600">Gestión de clientes y deudas</p>
@@ -213,7 +213,7 @@ export default function ClientesPage() {
                 <div className="flex items-center gap-2 bg-purple-50 p-2 rounded-lg border border-purple-200">
                   <span className="text-sm font-medium text-purple-700">📍 Sucursal:</span>
                   <select
-                    className="bg-white border-2 border-purple-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:border-purple-500 text-gray-900"
+                    className="bg-white border-2 border-purple-300 rounded-lg px-3 py-1 text-base focus:outline-none focus:border-purple-500 text-gray-900"
                     value={sucursalSeleccionada}
                     onChange={(e) => setSucursalSeleccionada(Number(e.target.value))}
                   >
@@ -264,14 +264,14 @@ export default function ClientesPage() {
                 <input
                   type="text"
                   placeholder="Nombre del cliente"
-                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-gray-900"
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-base text-gray-900"
                   value={nuevoNombre}
                   onChange={(e) => setNuevoNombre(e.target.value)}
                 />
                 <input
                   type="text"
                   placeholder="Teléfono (opcional)"
-                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-gray-900"
+                  className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-base text-gray-900"
                   value={nuevoTelefono}
                   onChange={(e) => setNuevoTelefono(e.target.value)}
                 />
@@ -298,7 +298,7 @@ export default function ClientesPage() {
                       : 'border-gray-200 hover:border-purple-300 bg-gray-50'
                       }`}
                   >
-                    <div className="flex justify-between items-start">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
                       <div>
                         <p className="font-bold text-gray-800">{cliente.nombre}</p>
                         {cliente.telefono && (
@@ -341,7 +341,7 @@ export default function ClientesPage() {
 
                   <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4 mt-4">
                     <p className="text-sm text-gray-600 mb-1">Saldo Total:</p>
-                    <p className={`text-4xl font-bold ${clienteSeleccionado.saldo_deuda > 0 ? 'text-red-600' : 'text-green-600'
+                    <p className={`text-2xl sm:text-3xl md:text-4xl font-bold ${clienteSeleccionado.saldo_deuda > 0 ? 'text-red-600' : 'text-green-600'
                       }`}>
                       ${Number(clienteSeleccionado.saldo_deuda).toFixed(2)}
                     </p>
@@ -363,14 +363,14 @@ export default function ClientesPage() {
                     <input
                       type="number"
                       placeholder="Monto del pago"
-                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-gray-900"
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-base text-gray-900"
                       value={montoPago}
                       onChange={(e) => setMontoPago(e.target.value)}
                     />
                     <input
                       type="text"
                       placeholder="Observaciones (opcional)"
-                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-gray-900"
+                      className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none text-base text-gray-900"
                       value={observaciones}
                       onChange={(e) => setObservaciones(e.target.value)}
                     />

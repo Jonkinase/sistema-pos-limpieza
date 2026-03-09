@@ -79,9 +79,9 @@ export default function DashboardPage() {
 
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
             <div>
-              <h1 className="text-4xl font-bold text-indigo-600 mb-2">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-indigo-600 mb-2">
                 📊 Dashboard
               </h1>
               <p className="text-gray-600">Panel de control y estadísticas</p>
@@ -102,9 +102,9 @@ export default function DashboardPage() {
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg p-6 text-white">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-semibold opacity-90">Ventas Hoy</h3>
-              <span className="text-3xl">📅</span>
+              <span className="text-2xl sm:text-3xl">📅</span>
             </div>
-            <p className="text-4xl font-bold mb-1">${stats.hoy.total.toFixed(2)}</p>
+            <p className="text-3xl sm:text-4xl font-bold mb-1">${stats.hoy.total.toFixed(2)}</p>
             <p className="text-sm opacity-80">{stats.hoy.cantidad} ventas</p>
           </div>
 
@@ -112,9 +112,9 @@ export default function DashboardPage() {
           <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-lg p-6 text-white">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-semibold opacity-90">Ventas del Mes</h3>
-              <span className="text-3xl">📈</span>
+              <span className="text-2xl sm:text-3xl">📈</span>
             </div>
-            <p className="text-4xl font-bold mb-1">${stats.mes.total.toFixed(2)}</p>
+            <p className="text-3xl sm:text-4xl font-bold mb-1">${stats.mes.total.toFixed(2)}</p>
             <p className="text-sm opacity-80">{stats.mes.cantidad} ventas</p>
           </div>
 
@@ -122,9 +122,9 @@ export default function DashboardPage() {
           <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl shadow-lg p-6 text-white">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-semibold opacity-90">Deudas Pendientes</h3>
-              <span className="text-3xl">💳</span>
+              <span className="text-2xl sm:text-3xl">💳</span>
             </div>
-            <p className="text-4xl font-bold mb-1">${stats.deudas.total.toFixed(2)}</p>
+            <p className="text-3xl sm:text-4xl font-bold mb-1">${stats.deudas.total.toFixed(2)}</p>
             <p className="text-sm opacity-80">{stats.deudas.clientes} clientes</p>
           </div>
 
@@ -132,9 +132,9 @@ export default function DashboardPage() {
           <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-lg p-6 text-white">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-semibold opacity-90">Presupuestos</h3>
-              <span className="text-3xl">📄</span>
+              <span className="text-2xl sm:text-3xl">📄</span>
             </div>
-            <p className="text-4xl font-bold mb-1">{stats.presupuestos.pendientes}</p>
+            <p className="text-2xl sm:text-3xl md:text-4xl font-bold mb-1">{stats.presupuestos.pendientes}</p>
             <p className="text-sm opacity-80">${stats.presupuestos.total.toFixed(2)} potencial</p>
           </div>
 
@@ -231,7 +231,7 @@ export default function DashboardPage() {
             <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
               ⚡ Accesos Rápidos
             </h2>
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
               <Link
                 href="/"
                 className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-4 rounded-lg text-center transition-all"

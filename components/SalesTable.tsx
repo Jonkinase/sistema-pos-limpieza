@@ -83,7 +83,7 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
 
                 <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
                     <div className="flex items-center gap-2">
-                        <label className="text-xs font-bold text-black uppercase">Desde:</label>
+                        <label className="text-xs sm:text-sm font-bold text-black uppercase">Desde:</label>
                         <input
                             type="date"
                             value={fechaDesde}
@@ -92,7 +92,7 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                         />
                     </div>
                     <div className="flex items-center gap-2">
-                        <label className="text-xs font-bold text-black uppercase">Hasta:</label>
+                        <label className="text-xs sm:text-sm font-bold text-black uppercase">Hasta:</label>
                         <input
                             type="date"
                             value={fechaHasta}
@@ -105,16 +105,79 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                             setFechaDesde(today);
                             setFechaHasta(today);
                         }}
-                        className="text-xs bg-white hover:bg-gray-100 text-black font-bold py-1.5 px-3 rounded-lg border border-gray-200 transition"
+                        className="text-xs sm:text-sm bg-white hover:bg-gray-100 text-black font-bold py-1.5 px-3 rounded-lg border border-gray-200 transition"
                     >
                         Hoy
                     </button>
                 </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="md:hidden space-y-3">
+                {loading ? (
+                    <div className="text-center py-4">Cargando ventas...</div>
+                ) : ventas.length === 0 ? (
+                    <div className="text-center py-4 text-gray-500">No hay ventas registradas en esta sucursal</div>
+                ) : (
+                    ventas.map((venta) => (
+                        <div key={venta.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <div className="flex justify-between items-start gap-2 mb-2">
+                                <div>
+                                    <p className="font-bold text-blue-600">#{venta.id}</p>
+                                    <p className="text-xs text-gray-600">{new Date(venta.fecha).toLocaleString()}</p>
+                                </div>
+                                <p className="font-bold text-black">${venta.total.toFixed(2)}</p>
+                            </div>
+
+                            <p className="text-sm text-black mb-1">
+                                <span className="font-semibold">Cliente:</span>{' '}
+                                {venta.cliente_nombre || <span className="italic">Consumidor Final</span>}
+                                {venta.tipo_venta === 'fiado' && (
+                                    <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-800 border border-orange-200">
+                                        Fiado
+                                    </span>
+                                )}
+                            </p>
+                            <p className="text-sm text-gray-700 mb-1">
+                                <span className="font-semibold">Vendedor:</span> {venta.vendedor_nombre || '-'}
+                            </p>
+                            <p className="text-sm text-gray-700 mb-3 break-words">
+                                <span className="font-semibold">Items:</span> {venta.items_resumen}
+                            </p>
+
+                            <div className="flex flex-wrap gap-1 pt-2 border-t border-gray-200">
+                                <button
+                                    onClick={() => setSelectedSale(venta)}
+                                    className="text-blue-500 hover:text-blue-700 font-medium text-xs px-2 py-1 min-h-[36px] bg-blue-50 rounded hover:bg-blue-100 transition"
+                                >
+                                    👁️ Ver
+                                </button>
+
+                                {onEdit && (userRole === 'admin' || userRole === 'encargado') && (
+                                    <button
+                                        onClick={() => onEdit(venta)}
+                                        className="text-orange-500 hover:text-orange-700 font-medium text-xs px-2 py-1 min-h-[36px] bg-orange-50 rounded hover:bg-orange-100 transition"
+                                    >
+                                        ✏️ Editar
+                                    </button>
+                                )}
+
+                                {(userRole === 'admin' || userRole === 'encargado') && (
+                                    <button
+                                        onClick={() => handleDelete(venta)}
+                                        className="text-red-500 hover:text-red-700 font-medium text-xs px-2 py-1 min-h-[36px] bg-red-50 rounded hover:bg-red-100 transition"
+                                    >
+                                        🗑️ Eliminar
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                    <thead className="text-xs sm:text-sm text-gray-700 uppercase bg-gray-50 border-b">
                         <tr>
                             <th className="px-4 py-3">ID / Fecha</th>
                             <th className="px-4 py-3">Cliente</th>
@@ -136,7 +199,6 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                         ) : (
                             ventas.map((venta) => (
                                 <tr key={venta.id} className="bg-white border-b hover:bg-gray-50">
-                                    {/* ... (Columns content same as original, just re-rendering to keep context) ... */}
                                     <td className="px-4 py-3">
                                         <span className="font-bold text-blue-600">#{venta.id}</span>
                                         <br />
@@ -163,29 +225,27 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                                     <td className="px-4 py-3 text-right font-bold text-black">
                                         ${venta.total.toFixed(2)}
                                     </td>
-                                    <td className="px-4 py-3 flex justify-center gap-2">
+                                    <td className="px-4 py-3 flex flex-wrap gap-1">
                                         <button
                                             onClick={() => setSelectedSale(venta)}
-                                            className="text-blue-500 hover:text-blue-700 font-medium text-xs px-2 py-1 bg-blue-50 rounded hover:bg-blue-100 transition"
+                                            className="text-blue-500 hover:text-blue-700 font-medium text-xs px-2 py-1 min-h-[36px] bg-blue-50 rounded hover:bg-blue-100 transition"
                                         >
                                             👁️ Ver
                                         </button>
 
-                                        {/* Botón Editar - Solo para admin y encargado */}
                                         {onEdit && (userRole === 'admin' || userRole === 'encargado') && (
                                             <button
                                                 onClick={() => onEdit(venta)}
-                                                className="text-orange-500 hover:text-orange-700 font-medium text-xs px-2 py-1 bg-orange-50 rounded hover:bg-orange-100 transition"
+                                                className="text-orange-500 hover:text-orange-700 font-medium text-xs px-2 py-1 min-h-[36px] bg-orange-50 rounded hover:bg-orange-100 transition"
                                             >
                                                 ✏️ Editar
                                             </button>
                                         )}
 
-                                        {/* Solo mostrar eliminar si es admin o encargado */}
                                         {(userRole === 'admin' || userRole === 'encargado') && (
                                             <button
                                                 onClick={() => handleDelete(venta)}
-                                                className="text-red-500 hover:text-red-700 font-medium text-xs px-2 py-1 bg-red-50 rounded hover:bg-red-100 transition"
+                                                className="text-red-500 hover:text-red-700 font-medium text-xs px-2 py-1 min-h-[36px] bg-red-50 rounded hover:bg-red-100 transition"
                                             >
                                                 🗑️ Eliminar
                                             </button>

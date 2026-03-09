@@ -425,26 +425,26 @@ export default function InventarioPage() {
       <div className="max-w-6xl mx-auto">
         {/* Header ... */}
         <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
             <div>
-              <h1 className="text-4xl font-bold text-emerald-600 mb-2">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-600 mb-2">
                 📦 Inventario / Stock
               </h1>
               <p className="text-gray-600">
                 Gestiona el stock por producto y sucursal.
               </p>
             </div>
-            <div className="flex gap-2 w-full md:w-auto">
+            <div className="flex flex-wrap gap-2 w-full">
               {/* Buscador */}
               <input
                 type="text"
                 placeholder="🔍 Buscar producto..."
-                className="p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none w-full md:w-64 text-gray-900"
+                className="min-w-[140px] flex-1 w-full sm:w-auto p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none text-base text-gray-900"
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
               />
               <select
-                className="p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none w-full md:w-40 text-gray-900 bg-white"
+                className="min-w-[140px] flex-1 w-full sm:w-auto p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none text-base text-gray-900 bg-white"
                 value={filtroTipo}
                 onChange={(e) => setFiltroTipo(e.target.value)}
               >
@@ -455,19 +455,19 @@ export default function InventarioPage() {
               </select>
               <button
                 onClick={abrirModalCrear}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg"
+                className="min-w-[140px] flex-1 w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg"
               >
                 ➕ Nuevo Producto
               </button>
               <button
                 onClick={exportarPreciosPDF}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg whitespace-nowrap"
+                className="min-w-[140px] flex-1 w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg whitespace-nowrap"
               >
                 📄 Exportar Tabla Precios
               </button>
               <Link
                 href="/"
-                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg"
+                className="min-w-[140px] flex-1 w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg"
               >
                 ← Volver a Ventas
               </Link>
@@ -482,7 +482,7 @@ export default function InventarioPage() {
                 Sucursal
               </label>
               <select
-                className={`p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none text-gray-900 ${user?.rol !== 'admin' ? 'opacity-70 pointer-events-none bg-gray-200' : ''}`}
+                className={`p-3 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none text-base text-gray-900 ${user?.rol !== 'admin' ? 'opacity-70 pointer-events-none bg-gray-200' : ''}`}
                 value={sucursalSeleccionada ?? ''}
                 onChange={(e) => setSucursalSeleccionada(Number(e.target.value))}
                 disabled={user?.rol !== 'admin'}
@@ -507,7 +507,70 @@ export default function InventarioPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="md:hidden space-y-3">
+            {sucursalSeleccionada === null ? (
+              <div className="text-center py-4">Selecciona sucursal</div>
+            ) : productos.length === 0 ? (
+              <div className="text-center py-4">No hay productos</div>
+            ) : productosFiltrados.length === 0 ? (
+              <div className="text-center py-4 text-gray-500">No hay productos para el filtro actual</div>
+            ) : (
+              productosFiltrados.map((producto: any) => {
+                const config = obtenerConfiguracionSucursal(producto.id, sucursalSeleccionada);
+                const actual = config?.cantidad_litros ?? 0;
+                const pMinorista = config?.precio_minorista ?? producto.precio_minorista;
+                const pMayorista = config?.precio_mayorista ?? producto.precio_mayorista;
+                const estaActivo = config ? config.activo === 1 : true;
+
+                return (
+                  <div key={producto.id} className={`border border-gray-200 rounded-lg p-4 bg-gray-50 ${!estaActivo ? 'opacity-50 grayscale' : ''}`}>
+                    <div className="flex justify-between items-start gap-2 mb-2">
+                      <div>
+                        <p className="font-bold text-gray-800">{producto.nombre}</p>
+                        <p className="text-sm text-gray-600 capitalize">
+                          {producto.tipo === 'alimento' ? 'Alimento' : (producto.tipo || 'Líquido')}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${estaActivo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                        {estaActivo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                      <p><span className="text-gray-500">Minorista:</span> <span className="font-bold text-gray-700">${Number(pMinorista).toFixed(2)}</span></p>
+                      <p><span className="text-gray-500">Mayorista:</span> <span className="font-bold text-gray-700">${pMayorista ? Number(pMayorista).toFixed(2) : '-'}</span></p>
+                      <p className="col-span-2">
+                        <span className="text-gray-500">Stock:</span>{' '}
+                        <span className="font-bold text-emerald-700">
+                          {producto.tipo === 'seco' ? Math.floor(Number(actual)) : Number(actual).toFixed(2)}
+                          <span className="text-gray-400 text-xs ml-1 font-normal">
+                            {producto.tipo === 'seco' ? 'u.' : (producto.tipo === 'alimento' ? 'kg' : 'L')}
+                          </span>
+                        </span>
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+                      <button
+                        onClick={() => abrirModalEditar(producto)}
+                        className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-3 rounded text-xs"
+                      >
+                        ✏️ Editar
+                      </button>
+                      <button
+                        onClick={() => eliminarProducto(producto.id, producto.nombre)}
+                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-3 rounded text-xs"
+                      >
+                        🗑️ Eliminar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
               <thead className="bg-emerald-50">
                 <tr>
@@ -536,7 +599,6 @@ export default function InventarioPage() {
               </thead>
               <tbody>
                 {sucursalSeleccionada === null ? (
-                  // ... same empty states
                   <tr><td colSpan={4} className="text-center py-4">Selecciona sucursal</td></tr>
                 ) : productos.length === 0 ? (
                   <tr><td colSpan={4} className="text-center py-4">No hay productos</td></tr>
@@ -652,7 +714,7 @@ export default function InventarioPage() {
                   <label className="block text-sm font-medium text-gray-700">Nombre del Producto</label>
                   <input
                     type="text"
-                    className="w-full mt-1 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
+                    className="w-full mt-1 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-base text-gray-900"
                     value={formProducto.nombre}
                     onChange={e => setFormProducto({ ...formProducto, nombre: e.target.value })}
                     placeholder={formProducto.tipo === 'liquido' ? 'Ej: Detergente Premium' : (formProducto.tipo === 'alimento' ? 'Ej: Alimento Perro Adulto' : 'Ej: Escoba Dura')}
@@ -668,7 +730,7 @@ export default function InventarioPage() {
                     <input
                       type="number"
                       step={formProducto.tipo === 'seco' ? "1" : "0.01"}
-                      className="w-full p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-lg font-bold text-right text-gray-900"
+                      className="w-full p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-base font-bold text-right text-gray-900"
                       value={formProducto.stock_actual || ''}
                       onChange={e => setFormProducto({ ...formProducto, stock_actual: e.target.value })}
                     />
@@ -678,7 +740,7 @@ export default function InventarioPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
                       {formProducto.tipo === 'alimento' ? 'Precio xKg' : 'Precio Minorista'}
@@ -687,7 +749,7 @@ export default function InventarioPage() {
                       <span className="absolute left-3 top-2 text-gray-500">$</span>
                       <input
                         type="number"
-                        className="w-full pl-7 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
+                        className="w-full pl-7 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-base text-gray-900"
                         value={formProducto.precio_minorista || ''}
                         onChange={e => setFormProducto({ ...formProducto, precio_minorista: e.target.value })}
                         placeholder="0.00"
@@ -702,7 +764,7 @@ export default function InventarioPage() {
                         <span className="absolute left-3 top-2 text-gray-500">$</span>
                         <input
                           type="number"
-                          className="w-full pl-7 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
+                          className="w-full pl-7 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-base text-gray-900"
                           value={formProducto.precio_mayorista || ''}
                           onChange={e => setFormProducto({ ...formProducto, precio_mayorista: e.target.value })}
                           placeholder="0.00"
@@ -734,7 +796,7 @@ export default function InventarioPage() {
                     <label className="block text-sm font-medium text-gray-700">Mínimo para Mayorista (Litros)</label>
                     <input
                       type="number"
-                      className="w-full mt-1 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-gray-900"
+                      className="w-full mt-1 p-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500 text-base text-gray-900"
                       value={formProducto.litros_minimo_mayorista || ''}
                       onChange={e => setFormProducto({ ...formProducto, litros_minimo_mayorista: e.target.value })}
                     />
@@ -757,4 +819,3 @@ export default function InventarioPage() {
     </div>
   );
 }
-
