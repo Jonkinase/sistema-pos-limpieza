@@ -9,8 +9,6 @@ type Producto = {
   id: number;
   nombre: string;
   tipo?: string;
-  precio_minorista: number;
-  precio_mayorista: number;
   litros_minimo_mayorista: number;
 };
 
@@ -75,6 +73,18 @@ export default function InventarioPage() {
 
   const router = useRouter();
 
+  const recargarDatos = (sucursalId: number) => {
+    fetch(`/api/productos?sucursal_id=${sucursalId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setProductos(data.productos || []);
+          setSucursales(data.sucursales || []);
+          setStocks(data.stocks || []);
+        }
+      });
+  };
+
   useEffect(() => {
     // Verificar rol
     fetch('/api/auth/me')
@@ -95,15 +105,19 @@ export default function InventarioPage() {
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          setProductos(data.productos || []);
           setSucursales(data.sucursales || []);
-          setStocks(data.stocks || []);
-          if (data.sucursales && data.sucursales.length > 0) {
-            setSucursalSeleccionada(prev => prev ?? data.sucursales[0].id);
+          const initialSid = sucursalSeleccionada ?? (data.sucursales && data.sucursales.length > 0 ? data.sucursales[0].id : null);
+          if (initialSid) {
+            setSucursalSeleccionada(initialSid);
+            recargarDatos(initialSid);
           }
         }
       });
   }, []);
+
+  useEffect(() => {
+    if (sucursalSeleccionada) recargarDatos(sucursalSeleccionada);
+  }, [sucursalSeleccionada]);
 
   const obtenerConfiguracionSucursal = (producto_id: number, sucursal_id: number) => {
     return stocks.find(
@@ -196,7 +210,6 @@ export default function InventarioPage() {
     precio_mayorista: '',
     litros_minimo_mayorista: '5',
     stock_actual: '', // Solo usado para editar stock
-    activo: 1
   });
 
   const abrirModalCrear = () => {
@@ -207,7 +220,6 @@ export default function InventarioPage() {
       precio_mayorista: '',
       litros_minimo_mayorista: '5',
       stock_actual: '0',
-      activo: 1
     });
     setModalCrearAbierto(true);
   };
@@ -218,11 +230,10 @@ export default function InventarioPage() {
     setFormProducto({
       nombre: producto.nombre,
       tipo: producto.tipo || 'liquido',
-      precio_minorista: (config?.precio_minorista ?? producto.precio_minorista).toString(),
-      precio_mayorista: (config?.precio_mayorista ?? producto.precio_mayorista)?.toString() || '',
+      precio_minorista: (config?.precio_minorista ?? 0).toString(),
+      precio_mayorista: (config?.precio_mayorista ?? 0).toString(),
       litros_minimo_mayorista: producto.litros_minimo_mayorista?.toString() || '5',
       stock_actual: (config?.cantidad_litros ?? 0).toString(),
-      activo: config?.activo ?? 1
     });
     setModalEditarAbierto(true);
   };
@@ -285,7 +296,6 @@ export default function InventarioPage() {
       const nuevaCantidad = parseFloat(formProducto.stock_actual);
       const nuevoPrecioMin = parseFloat(formProducto.precio_minorista);
       const nuevoPrecioMay = formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : (formProducto.tipo === 'alimento' ? nuevoPrecioMin : nuevoPrecioMin);
-      const nuevoActivo = formProducto.activo;
 
       const resStock = await fetch('/api/stock', {
         method: 'POST',
@@ -296,7 +306,7 @@ export default function InventarioPage() {
           cantidad_litros: nuevaCantidad,
           precio_minorista: nuevoPrecioMin,
           precio_mayorista: nuevoPrecioMay,
-          activo: nuevoActivo
+          activo: 1
         }),
       });
       const dataStock = await resStock.json();
@@ -319,14 +329,7 @@ export default function InventarioPage() {
   };
 
   const recargarTodo = () => {
-    fetch('/api/stock')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          setProductos(data.productos || []);
-          setStocks(data.stocks || []);
-        }
-      });
+    if (sucursalSeleccionada) recargarDatos(sucursalSeleccionada);
   };
 
   const exportarPreciosPDF = () => {
@@ -334,8 +337,15 @@ export default function InventarioPage() {
     const colorNaranja = [243, 156, 18]; // Naranja para el header similar a la imagen
     const colorTexto = [44, 62, 80];
 
-    // Usar productos ya filtrados por el usuario
-    const productosAExportar = [...productosFiltrados].sort((a: any, b: any) => {
+    // Usar productos ya filtrados por el usuario y añadirles precios desde stock
+    const productosAExportar = [...productosFiltrados].map(p => {
+      const config = obtenerConfiguracionSucursal(p.id, sucursalSeleccionada!);
+      return {
+        ...p,
+        precio_minorista: config?.precio_minorista ?? 0,
+        precio_mayorista: config?.precio_mayorista ?? 0
+      };
+    }).sort((a: any, b: any) => {
       const tipoA = a.tipo || 'liquido';
       const tipoB = b.tipo || 'liquido';
 
@@ -518,12 +528,10 @@ export default function InventarioPage() {
               productosFiltrados.map((producto: any) => {
                 const config = obtenerConfiguracionSucursal(producto.id, sucursalSeleccionada);
                 const actual = config?.cantidad_litros ?? 0;
-                const pMinorista = config?.precio_minorista ?? producto.precio_minorista;
-                const pMayorista = config?.precio_mayorista ?? producto.precio_mayorista;
-                const estaActivo = config ? config.activo === 1 : true;
-
+                const pMinorista = config?.precio_minorista ?? 0;
+                const pMayorista = config?.precio_mayorista ?? 0;
                 return (
-                  <div key={producto.id} className={`border border-gray-200 rounded-lg p-4 bg-gray-50 ${!estaActivo ? 'opacity-50 grayscale' : ''}`}>
+                  <div key={producto.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                     <div className="flex justify-between items-start gap-2 mb-2">
                       <div>
                         <p className="font-bold text-gray-800">{producto.nombre}</p>
@@ -531,9 +539,6 @@ export default function InventarioPage() {
                           {producto.tipo === 'alimento' ? 'Alimento' : (producto.tipo || 'Líquido')}
                         </p>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${estaActivo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                        {estaActivo ? 'Activo' : 'Inactivo'}
-                      </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-sm mb-3">
@@ -589,9 +594,6 @@ export default function InventarioPage() {
                   <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 border-b">
                     Stock
                   </th>
-                  <th className="px-4 py-2 text-center text-sm font-semibold text-gray-700 border-b">
-                    Estado
-                  </th>
                   <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 border-b">
                     Acción
                   </th>
@@ -606,12 +608,11 @@ export default function InventarioPage() {
                   productosFiltrados.map((producto: any) => {
                     const config = obtenerConfiguracionSucursal(producto.id, sucursalSeleccionada);
                     const actual = config?.cantidad_litros ?? 0;
-                    const pMinorista = config?.precio_minorista ?? producto.precio_minorista;
-                    const pMayorista = config?.precio_mayorista ?? producto.precio_mayorista;
-                    const estaActivo = config ? config.activo === 1 : true;
+                    const pMinorista = config?.precio_minorista ?? 0;
+                    const pMayorista = config?.precio_mayorista ?? 0;
 
                     return (
-                      <tr key={producto.id} className={`hover:bg-gray-50 ${!estaActivo ? 'opacity-50 grayscale' : ''}`}>
+                      <tr key={producto.id} className="hover:bg-gray-50">
                         <td className="px-4 py-2 text-sm text-gray-800 border-b font-medium">
                           {producto.nombre}
                         </td>
@@ -628,11 +629,6 @@ export default function InventarioPage() {
                           {producto.tipo === 'seco' ? Math.floor(Number(actual)) : Number(actual).toFixed(2)}
                           <span className="text-gray-400 text-xs ml-1 font-normal">
                             {producto.tipo === 'seco' ? 'u.' : (producto.tipo === 'alimento' ? 'kg' : 'L')}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 text-sm text-center border-b">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${estaActivo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                            {estaActivo ? 'Activo' : 'Inactivo'}
                           </span>
                         </td>
                         <td className="px-4 py-2 text-sm text-right border-b">
@@ -774,22 +770,6 @@ export default function InventarioPage() {
                   )}
                 </div>
 
-                {/* Toggle de Activo (Solo Admin) */}
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                  <span className="text-sm font-medium text-gray-700">Habilitar en este local</span>
-                  <button
-                    onClick={() => {
-                      if (user?.rol === 'admin') {
-                        setFormProducto({ ...formProducto, activo: formProducto.activo === 1 ? 0 : 1 });
-                      } else {
-                        alert('Solo los administradores pueden cambiar la disponibilidad de productos en el local.');
-                      }
-                    }}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formProducto.activo === 1 ? 'bg-emerald-500' : 'bg-gray-300'} ${user?.rol !== 'admin' ? 'cursor-not-allowed opacity-70' : ''}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formProducto.activo === 1 ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
-                </div>
 
                 {formProducto.tipo === 'liquido' && (
                   <div>

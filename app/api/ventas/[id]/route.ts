@@ -25,11 +25,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       SELECT 
         v.*,
         s.nombre AS sucursal_nombre,
+        s.direccion AS sucursal_direccion,
         c.nombre AS cliente_nombre,
-        c.telefono AS cliente_telefono
+        c.telefono AS cliente_telefono,
+        n.nombre AS negocio_nombre,
+        n.direccion AS negocio_direccion,
+        n.telefono AS negocio_telefono,
+        n.cuit AS negocio_cuit
       FROM ventas v
       JOIN sucursales s ON v.sucursal_id = s.id
       LEFT JOIN clientes c ON v.cliente_id = c.id
+      CROSS JOIN (SELECT * FROM negocio LIMIT 1) n
       WHERE v.id = $1
     `,
       [ventaId]

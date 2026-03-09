@@ -20,6 +20,17 @@ export async function initDatabase() {
   try {
     await client.query('BEGIN');
 
+    // Tabla de Negocio
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS negocio (
+        id SERIAL PRIMARY KEY,
+        nombre TEXT NOT NULL DEFAULT 'Mi Negocio',
+        direccion TEXT,
+        telefono TEXT,
+        cuit TEXT
+      )
+    `);
+
     // Tabla de Sucursales
     await client.query(`
       CREATE TABLE IF NOT EXISTS sucursales (
@@ -35,8 +46,7 @@ export async function initDatabase() {
       CREATE TABLE IF NOT EXISTS productos (
         id SERIAL PRIMARY KEY,
         nombre TEXT NOT NULL,
-        precio_minorista DECIMAL(12, 2) NOT NULL,
-        precio_mayorista DECIMAL(12, 2) NOT NULL,
+        sucursal_id INTEGER NOT NULL REFERENCES sucursales(id),
         litros_minimo_mayorista DECIMAL(12, 2) DEFAULT 5.0,
         tipo TEXT DEFAULT 'liquido',
         activo INTEGER DEFAULT 1
@@ -53,7 +63,7 @@ export async function initDatabase() {
         precio_minorista DECIMAL(12, 2),
         precio_mayorista DECIMAL(12, 2),
         activo INTEGER DEFAULT 1,
-        UNIQUE(producto_id, sucursal_id)
+        UNIQUE(producto_id)
       )
     `);
 
@@ -97,11 +107,12 @@ export async function initDatabase() {
     `);
 
     // Migración para añadir usuario_id si no existe
+    await client.query('SAVEPOINT migration_usuario_id_ventas');
     try {
       await client.query('ALTER TABLE ventas ADD COLUMN IF NOT EXISTS usuario_id INTEGER REFERENCES usuarios(id)');
     } catch (e) {
-      // Ignorar si falla (ej. ya existe y la sintaxis IF NOT EXISTS no es soportada en versiones viejas, 
-      // aunque en PG 9.6+ funciona para columnas)
+      await client.query('ROLLBACK TO SAVEPOINT migration_usuario_id_ventas');
+      // Ignorar si falla (ej. ya existe)
     }
 
     // Tabla de Detalle de Ventas
@@ -154,18 +165,18 @@ export async function initDatabase() {
       )
     `);
 
-    // Las migraciones de columnas se pueden manejar con ALTER TABLE si es necesario, 
-    // pero para PostgreSQL es mejor tener el esquema base sólido.
-
     // Migración para presupuestos: asegurar ON DELETE SET NULL en venta_id
+    await client.query('SAVEPOINT migration_presupuestos_constraint');
     try {
       await client.query('ALTER TABLE presupuestos DROP CONSTRAINT IF EXISTS presupuestos_venta_id_fkey');
       await client.query('ALTER TABLE presupuestos ADD CONSTRAINT presupuestos_venta_id_fkey FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE SET NULL');
     } catch (e) {
-      console.log('⚠️ Nota: No se pudo actualizar la constraint de presupuestos (puede que ya esté bien o la tabla no exista aún)');
+      await client.query('ROLLBACK TO SAVEPOINT migration_presupuestos_constraint');
+      console.log('⚠️ Nota: No se pudo actualizar la constraint de presupuestos');
     }
 
     // MIGRACIÓN: Descentralización de Inventario (Precios y Activo por Local)
+    await client.query('SAVEPOINT migration_inventario_descentralizado');
     try {
       // 1. Añadir columnas a la tabla stock si no existen
       await client.query('ALTER TABLE stock ADD COLUMN IF NOT EXISTS precio_minorista DECIMAL(12, 2)');
@@ -185,6 +196,7 @@ export async function initDatabase() {
       `);
       console.log('✅ Migración de inventario descentralizado completada');
     } catch (e) {
+      await client.query('ROLLBACK TO SAVEPOINT migration_inventario_descentralizado');
       console.error('❌ Error en migración de inventario descentralizado:', e);
     }
 
@@ -193,6 +205,21 @@ export async function initDatabase() {
     if (parseInt(sucursalesCount.rows[0].count) === 0) {
       await client.query('INSERT INTO sucursales (nombre, direccion) VALUES ($1, $2)', ['Local 1', 'Dirección Local 1']);
       await client.query('INSERT INTO sucursales (nombre, direccion) VALUES ($1, $2)', ['Local 2', 'Dirección Local 2']);
+    }
+
+    // Inserción inicial de negocio
+    await client.query('SAVEPOINT migration_negocio');
+    try {
+      const negocioCount = await client.query('SELECT COUNT(*) FROM negocio');
+      if (parseInt(negocioCount.rows[0].count) === 0) {
+        await client.query(
+          'INSERT INTO negocio (nombre) VALUES ($1)',
+          ['Mi Negocio']
+        );
+      }
+    } catch (e) {
+      await client.query('ROLLBACK TO SAVEPOINT migration_negocio');
+      console.error('❌ Error en inserción inicial de negocio:', e);
     }
 
     // Insertar usuario administrador
@@ -206,6 +233,7 @@ export async function initDatabase() {
     }
 
     // Migración para Item Rápido y Seguridad Histórica
+    await client.query('SAVEPOINT migration_item_rapido');
     try {
       // 1. Añadir columna producto_nombre si no existe
       await client.query('ALTER TABLE detalle_ventas ADD COLUMN IF NOT EXISTS producto_nombre TEXT');
@@ -223,7 +251,36 @@ export async function initDatabase() {
 
       console.log('✅ Migración de Item Rápido y Seguridad Histórica completada');
     } catch (e) {
+      await client.query('ROLLBACK TO SAVEPOINT migration_item_rapido');
       console.error('❌ Error en migración de Item Rápido:', e);
+    }
+
+    // MIGRACIÓN: Productos por Sucursal y Limpieza de Precios
+    await client.query('SAVEPOINT migration_productos_sucursal_limpieza');
+    try {
+      await client.query('ALTER TABLE productos ADD COLUMN IF NOT EXISTS sucursal_id INTEGER REFERENCES sucursales(id)');
+      await client.query('UPDATE productos SET sucursal_id = 1 WHERE sucursal_id IS NULL');
+      await client.query('ALTER TABLE productos DROP COLUMN IF EXISTS precio_minorista');
+      await client.query('ALTER TABLE productos DROP COLUMN IF EXISTS precio_mayorista');
+      
+      // Reemplazar constraint en stock
+      await client.query('ALTER TABLE stock DROP CONSTRAINT IF EXISTS stock_producto_id_sucursal_id_key');
+      await client.query('ALTER TABLE stock ADD CONSTRAINT stock_producto_id_key UNIQUE (producto_id)');
+      
+      console.log('✅ Migración de productos por sucursal completada');
+    } catch (e) {
+      await client.query('ROLLBACK TO SAVEPOINT migration_productos_sucursal_limpieza');
+      console.error('❌ Error en migración de productos por sucursal:', e);
+    }
+
+    // MIGRACIÓN: Columna activo en usuarios
+    await client.query('SAVEPOINT migration_usuarios_activo');
+    try {
+      await client.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS activo INTEGER DEFAULT 1');
+      console.log('✅ Migración de columna activo en usuarios completada');
+    } catch (e) {
+      await client.query('ROLLBACK TO SAVEPOINT migration_usuarios_activo');
+      console.error('❌ Error en migración de columna activo en usuarios:', e);
     }
 
     await client.query('COMMIT');
@@ -237,9 +294,5 @@ export async function initDatabase() {
   }
 }
 
-// Inicializar base de datos
-initDatabase().catch(err => {
-  console.error('Failed to initialize database:', err);
-});
-
+// Exportar el pool como default
 export default pool;

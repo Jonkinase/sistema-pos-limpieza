@@ -77,12 +77,14 @@ export default function ClientesPage() {
       })
       .catch(() => router.push('/'));
 
-    // Cargar sucursales (reutilizando api de productos que las devuelve)
-    fetch('/api/productos')
+    // Cargar sucursales
+    fetch('/api/sucursales')
       .then(res => res.json())
       .then(data => {
-        if (data.success) {
-          setSucursales(data.sucursales || []);
+        const sucursalesList = data.sucursales || [];
+        setSucursales(sucursalesList);
+        if (sucursalesList.length > 0 && !sucursalSeleccionada) {
+          setSucursalSeleccionada(sucursalesList[0].id);
         }
       });
   }, []);

@@ -1,20 +1,25 @@
 import db from "@/lib/db/database";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const productosResult = await db.query('SELECT * FROM productos WHERE activo = 1');
+    const { searchParams } = new URL(request.url);
+    const sucursal_id = searchParams.get('sucursal_id');
+
+    if (!sucursal_id) {
+      return NextResponse.json({ success: false, error: "sucursal_id es requerido" }, { status: 400 });
+    }
+
+    const productosResult = await db.query('SELECT * FROM productos WHERE activo = 1 AND sucursal_id = $1', [sucursal_id]);
     const productos = productosResult.rows.map(p => ({
       ...p,
-      precio_minorista: parseFloat(p.precio_minorista),
-      precio_mayorista: p.precio_mayorista ? parseFloat(p.precio_mayorista) : null,
       litros_minimo_mayorista: p.litros_minimo_mayorista ? parseFloat(p.litros_minimo_mayorista) : null
     }));
 
     const sucursalesResult = await db.query('SELECT * FROM sucursales');
     const sucursales = sucursalesResult.rows;
 
-    const stocksResult = await db.query('SELECT * FROM stock');
+    const stocksResult = await db.query('SELECT * FROM stock WHERE sucursal_id = $1', [sucursal_id]);
     const stocks = stocksResult.rows.map(s => ({
       ...s,
       cantidad_litros: parseFloat(s.cantidad_litros)
@@ -39,6 +44,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { nombre, tipo, precio_minorista, precio_mayorista, litros_minimo_mayorista, stock_inicial, sucursal_id } = body;
 
+    if (!sucursal_id) {
+      return NextResponse.json({ success: false, error: "sucursal_id es requerido" }, { status: 400 });
+    }
+
     if (!nombre || !precio_minorista) {
       return NextResponse.json({ success: false, error: "Nombre y precio son obligatorios" }, { status: 400 });
     }
@@ -51,23 +60,18 @@ export async function POST(request: Request) {
     const lMinimos = tipoProducto === 'seco' ? 0 : (litros_minimo_mayorista || 5);
 
     const result = await db.query(`
-      INSERT INTO productos (nombre, tipo, precio_minorista, precio_mayorista, litros_minimo_mayorista)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO productos (nombre, tipo, litros_minimo_mayorista, sucursal_id)
+      VALUES ($1, $2, $3, $4)
       RETURNING id
-    `, [nombre, tipoProducto, precio_minorista, pMayorista, lMinimos]);
+    `, [nombre, tipoProducto, lMinimos, sucursal_id]);
 
     const newProductId = result.rows[0].id;
 
-    // Inicializar stock en 0 para todas las sucursales existentes
-    const sucursales = (await db.query('SELECT id FROM sucursales')).rows;
-
-    for (const sucursal of sucursales) {
-      const cantidad = (stock_inicial && sucursal_id === sucursal.id) ? parseFloat(stock_inicial) : 0;
-      await db.query(`
-        INSERT INTO stock (producto_id, sucursal_id, cantidad_litros, precio_minorista, precio_mayorista, activo) 
-        VALUES ($1, $2, $3, $4, $5, 1)
-      `, [newProductId, sucursal.id, cantidad, precio_minorista, pMayorista]);
-    }
+    // Inicializar stock solo para la sucursal recibida
+    await db.query(`
+      INSERT INTO stock (producto_id, sucursal_id, cantidad_litros, precio_minorista, precio_mayorista, activo) 
+      VALUES ($1, $2, $3, $4, $5, 1)
+    `, [newProductId, sucursal_id, stock_inicial || 0, precio_minorista, pMayorista]);
 
     return NextResponse.json({
       success: true,
@@ -87,7 +91,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, nombre, tipo, precio_minorista, precio_mayorista, litros_minimo_mayorista } = body;
+    const { id, nombre, tipo, litros_minimo_mayorista } = body;
 
     if (!id || !nombre) {
       return NextResponse.json({ success: false, error: "ID y Nombre son obligatorios" }, { status: 400 });
@@ -103,15 +107,20 @@ export async function PUT(request: Request) {
 
     const nombreFinal = nombre || currentProduct.nombre;
     const tipoProducto = tipo || currentProduct.tipo || 'liquido';
-    const pMinoristaFinal = precio_minorista !== undefined ? precio_minorista : currentProduct.precio_minorista;
-    const pMayoristaFinal = precio_mayorista !== undefined ? precio_mayorista : (precio_minorista !== undefined ? precio_minorista : currentProduct.precio_mayorista);
     const lMinimosFinal = litros_minimo_mayorista !== undefined ? litros_minimo_mayorista : currentProduct.litros_minimo_mayorista;
 
     await db.query(`
       UPDATE productos 
-      SET nombre = $1, tipo = $2, precio_minorista = $3, precio_mayorista = $4, litros_minimo_mayorista = $5
-      WHERE id = $6
-    `, [nombreFinal, tipoProducto, pMinoristaFinal, pMayoristaFinal, lMinimosFinal, id]);
+      SET nombre = $1, tipo = $2, litros_minimo_mayorista = $3
+      WHERE id = $4
+    `, [nombreFinal, tipoProducto, lMinimosFinal, id]);
+
+    if (body.precio_minorista !== undefined || body.precio_mayorista !== undefined) {
+      await db.query(`
+        UPDATE stock SET precio_minorista = $1, precio_mayorista = $2 
+        WHERE producto_id = $3
+      `, [body.precio_minorista, body.precio_mayorista, id]);
+    }
 
     return NextResponse.json({
       success: true,

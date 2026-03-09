@@ -111,11 +111,12 @@ export async function POST(
     // Insertar detalles de venta
     for (const detalle of detalles) {
       await client.query(`
-        INSERT INTO detalle_ventas (venta_id, producto_id, cantidad_litros, precio_unitario, subtotal)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO detalle_ventas (venta_id, producto_id, producto_nombre, cantidad_litros, precio_unitario, subtotal)
+        VALUES ($1, $2, $3, $4, $5, $6)
       `, [
         venta_id,
         detalle.producto_id,
+        detalle.producto_nombre,
         detalle.cantidad_litros,
         detalle.precio_unitario,
         detalle.subtotal

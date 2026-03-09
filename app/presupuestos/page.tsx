@@ -59,11 +59,13 @@ export default function PresupuestosPage() {
       });
 
     // Cargar sucursales
-    fetch('/api/productos')
+    fetch('/api/sucursales')
       .then(res => res.json())
       .then(data => {
-        if (data.success) {
-          setSucursales(data.sucursales || []);
+        const sucursalesList = data.sucursales || [];
+        setSucursales(sucursalesList);
+        if (sucursalesList.length > 0 && !sucursalSeleccionada) {
+          setSucursalSeleccionada(sucursalesList[0].id);
         }
       });
   }, []);

@@ -2,7 +2,7 @@
 
 Sistema web de punto de venta para productos de limpieza, con soporte multisucursal, cuentas corrientes, inventario por local, presupuestos y reportes.
 
-## Estado actual del sistema
+## Características Principales
 
 Este repositorio está **operativo** y en uso con los siguientes módulos:
 
@@ -15,14 +15,18 @@ Este repositorio está **operativo** y en uso con los siguientes módulos:
 - Ticket de venta con vista para impresión.
 - Reportes de ventas y deudas en CSV compatible con Excel.
 
-Además, ya se aplicaron mejoras responsive clave:
+### ⚙️ Configuración del Sistema
+- Datos del negocio (nombre, dirección, teléfono, CUIT)
+- Gestión de locales/sucursales (crear, editar, activar/inactivar)
+- Inactivación en cascada de productos y usuarios al desactivar un local
+- Acceso exclusivo para el rol Administrador
 
-- Vista en **tarjetas para móvil** en historial de ventas.
-- Vista en **tarjetas para móvil** en productos de inventario.
-- Vista en **tarjetas para móvil** en usuarios.
-- Ajustes de tipografía y controles para mejor legibilidad en pantallas chicas.
+## 📱 Responsive Design
+- Interfaz adaptada para dispositivos móviles
+- Compatible con pantallas desde 360px
+- Menú y formularios optimizados para touch
 
-## Stack técnico
+## Tecnologías
 
 - Next.js 16 (App Router)
 - React 19 + TypeScript
@@ -165,12 +169,14 @@ npm run start  # Run producción
 npm run lint   # Lint
 ```
 
-## Estructura de carpetas
+## Estructura del Proyecto
 
 ```text
 app/
   api/
+    configuracion/ # Endpoints de configuración
   clientes/
+  configuracion/   # Configuración del negocio y sucursales
   dashboard/
   inventario/
   login/

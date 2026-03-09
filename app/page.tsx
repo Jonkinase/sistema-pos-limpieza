@@ -8,9 +8,8 @@ type Producto = {
   id: number;
   nombre: string;
   tipo?: string;
-  precio_minorista: number;
-  precio_mayorista: number;
   litros_minimo_mayorista: number;
+  sucursal_id: number;
 };
 
 type Sucursal = {
@@ -82,27 +81,9 @@ export default function PuntoDeVenta() {
     }
   };
 
-  // Cargar usuario y datos iniciales
+  // 1. Cargar datos básicos de sesión y sucursales al montar
   useEffect(() => {
-    // 1. Obtener usuario actual (simulado obteniendo cookies o una ruta de "me")
-    // En este caso, podemos decodificar el token o hacer un fetch a una ruta de perfil.
-    // Para simplificar y reutilizar, asumiremos que si entra a /usuarios falla es porque no es admin,
-    // pero necesitamos saber el rol exacto aquí. 
-    // Vamos a crear una pequeña utilidad/fetch inline para obtener el usuario desde el auth_token (via API helper si existiera, o probando acceso).
-
-    // Mejor estrategia: el middleware ya protege, pero necesitamos el dato del rol en el cliente.
-    // Vamos a leer la cookie si es posible (no seguro en httpOnly) o hacer una request a un endpoint de session.
-    // Por ahora, vamos a confiar en que la API de productos nos deja pasar, y vamos a agregar un endpoint liviano /api/auth/me o similar.
-    // O mejor, vamos a inferir del login si lo guardaramos en localStorage, pero por seguridad es mejor server-side.
-    // Vamos a agregar un endpoint rápido de "me" o usar el de usuarios filtrado? No, creemos algo simple.
-
-    // WORKAROUND: Vamos a hacer un fetch a api/usuarios (que solo admite admin) para ver si somos admin.
-    // Si falla 403, somos vendedor. Pero necesitamos saber la sucursal del vendedor.
-    // PLAN UPDATE: Vamos a modificar el login para devolver el usuario y guardarlo en localStorage para uso simple de UI,
-    // O vamos a implementar /api/auth/me. Vamos a implementar /api/auth/me inline en este mismo bloque de useEffect llamando a una nueva ruta o...
-    // MOMENTO: El login ya devuelve el usuario. Podemos guardarlo en localStorage o Context.
-    // Como no tenemos Context global configurado, usaremos una llamada a una nueva ruta /api/auth/me que crearemos ahora mismo.
-
+    // Primero el usuario
     fetch('/api/auth/me')
       .then(res => {
         if (res.ok) return res.json();
@@ -110,50 +91,74 @@ export default function PuntoDeVenta() {
       })
       .then(data => {
         if (data.success) {
-          setUser(data.user);
-          if (data.user.rol !== 'admin' && data.user.sucursal_id) {
-            setSucursalSeleccionada(data.user.sucursal_id);
-          }
+          const userData = data.user;
+          setUser(userData);
+          
+          // Solo después de tener el usuario, cargar sucursales
+          return fetch('/api/sucursales').then(res => res.json()).then(sucData => {
+            const sucursalesList = sucData.sucursales || [];
+            setSucursales(sucursalesList);
+            
+            // Determinar sucursal inicial una vez tenemos AMBOS: user y sucursales
+            if (userData.rol !== 'admin' && userData.sucursal_id) {
+              setSucursalSeleccionada(userData.sucursal_id);
+            } else if (sucursalesList.length > 0) {
+              // Admin: tomar la primera disponible
+              setSucursalSeleccionada(sucursalesList[0].id);
+            }
+          });
         }
+        throw new Error('Auth failed');
       })
-      .catch(() => router.push('/login'));
+      .catch((err) => {
+        console.error('Error inicializando:', err);
+        router.push('/login');
+      });
+  }, []);
 
-    fetch('/api/productos')
+  // 1.1 Sincronizar sucursal inicial cuando el usuario se carga (si no se hizo antes)
+  useEffect(() => {
+    if (user && sucursales.length > 0 && !sucursalSeleccionada) {
+      if (user.rol !== 'admin' && user.sucursal_id) {
+        setSucursalSeleccionada(user.sucursal_id);
+      } else if (sucursales.length > 0) {
+        setSucursalSeleccionada(sucursales[0].id);
+      }
+    }
+  }, [user, sucursales]);
+
+  // 2. Fetch de productos dependiente de sucursalSeleccionada
+  useEffect(() => {
+    if (!sucursalSeleccionada) return;
+    fetch(`/api/productos?sucursal_id=${sucursalSeleccionada}`)
       .then(res => res.json())
       .then(data => {
         setProductos(data.productos || []);
-        setSucursales(data.sucursales || []);
         setStocks(data.stocks || []);
-        // Only set default sucursal if none is set (e.g. for admin)
-        if (data.sucursales && data.sucursales.length > 0) {
-          setSucursalSeleccionada(prev => prev ?? data.sucursales[0].id);
+      });
+  }, [sucursalSeleccionada, salesRefreshTrigger]);
+
+  // 3. Fetch de clientes dependiente de sucursalSeleccionada
+  useEffect(() => {
+    if (!sucursalSeleccionada) return;
+    fetch(`/api/clientes?sucursal_id=${sucursalSeleccionada}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setClientes(data.clientes || []);
         }
       });
+  }, [sucursalSeleccionada, salesRefreshTrigger]);
 
-    // Fetch clients
-    if (sucursalSeleccionada) {
-      fetch(`/api/clientes?sucursal_id=${sucursalSeleccionada}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            setClientes(data.clientes || []);
-          }
-        });
-    }
-
-    // Cargar presupuesto si viene por query param
+  // 4. Cargar presupuesto si viene por query param
+  useEffect(() => {
     const presupuestoId = searchParams.get('convertir_presupuesto');
-    if (presupuestoId && !idPresupuestoConvertiendo) {
+    if (presupuestoId && !idPresupuestoConvertiendo && sucursalSeleccionada) {
       fetch(`/api/presupuestos/${presupuestoId}`)
         .then(res => res.json())
         .then(data => {
           if (data.success) {
             const { presupuesto, detalles } = data;
-
-            // Si el presupuesto tiene un cliente_nombre, intentar asociarlo
-            // NOTA: El sistema asocia por ID, si el presupuesto solo tiene texto, 
-            // el usuario deberá seleccionar el cliente manualmente en el carrito.
-            // Pero si el cliente existe, podemos pre-seleccionarlo.
             const clienteExistente = clientes.find(c => c.nombre.toLowerCase() === presupuesto.cliente_nombre.toLowerCase());
             if (clienteExistente) setClienteSeleccionado(clienteExistente.id);
 
@@ -169,13 +174,11 @@ export default function PuntoDeVenta() {
             setCarrito(itemsBudget);
             setIdPresupuestoConvertiendo(presupuesto.id);
             setSucursalSeleccionada(presupuesto.sucursal_id);
-
-            // Limpiar el query param para evitar recargas infinitas
             router.replace('/', { scroll: false });
           }
         });
     }
-  }, [salesRefreshTrigger, sucursalSeleccionada, searchParams]);
+  }, [searchParams, sucursalSeleccionada, clientes, idPresupuestoConvertiendo, router]);
 
   const stockActualSeleccionado = (() => {
     if (!productoSeleccionado || !sucursalSeleccionada) return null;
@@ -190,7 +193,6 @@ export default function PuntoDeVenta() {
   // Filtrar productos por búsqueda y disponibilidad en local
   const productosFiltrados = productos.filter(p => {
     const stockConfig = stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada);
-    // Si no hay registro de stock para la sucursal, por defecto está activo pero con stock 0 (solo si es nuevo? no, mejor filtrar si activo === 1)
     const estaActivo = stockConfig ? stockConfig.activo === 1 : true;
     return estaActivo && p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase());
   });
@@ -255,8 +257,8 @@ export default function PuntoDeVenta() {
 
     // Aplicar lógica mayorista/minorista usando precios DEL LOCAL
     const stockConfig = stocks.find(s => s.producto_id === productoSeleccionado && s.sucursal_id === sucursalSeleccionada);
-    const pMinorista = stockConfig?.precio_minorista ?? producto.precio_minorista;
-    const pMayorista = stockConfig?.precio_mayorista ?? producto.precio_mayorista;
+    const pMinorista = stockConfig?.precio_minorista ?? 0;
+    const pMayorista = stockConfig?.precio_mayorista ?? 0;
 
     const esMayorista = litros >= producto.litros_minimo_mayorista;
     const precioUnitario = esMayorista ? pMayorista : pMinorista;
@@ -272,6 +274,19 @@ export default function PuntoDeVenta() {
       total: total,
       ahorro: ahorroMayorista
     });
+  };
+
+  const handleCambioSucursal = (nuevaSucursalId: number) => {
+    if (carrito.length > 0) {
+      if (!confirm('Cambiar de sucursal vaciará el carrito actual. ¿Deseas continuar?')) {
+        return;
+      }
+      setCarrito([]);
+    }
+    
+    setSucursalSeleccionada(nuevaSucursalId);
+    setProductoSeleccionado(0);
+    setResultado(null);
   };
 
   // Abrir modal al seleccionar producto
@@ -505,6 +520,12 @@ export default function PuntoDeVenta() {
                     >
                       📦 Inventario
                     </Link>
+                    <Link
+                      href="/configuracion"
+                      className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-1.5 px-4 rounded-lg text-sm"
+                    >
+                      ⚙️ Configuración
+                    </Link>
                   </>
                 )}
                 <Link
@@ -523,7 +544,7 @@ export default function PuntoDeVenta() {
                 <select
                   className={`bg-gray-100 border border-gray-300 rounded-lg px-2 py-1 text-base focus:outline-none focus:border-blue-500 text-gray-900 ${user?.rol !== 'admin' ? 'opacity-70 pointer-events-none bg-gray-200' : ''}`}
                   value={sucursalSeleccionada ?? ''}
-                  onChange={(e) => setSucursalSeleccionada(Number(e.target.value))}
+                  onChange={(e) => handleCambioSucursal(Number(e.target.value))}
                   disabled={user?.rol !== 'admin' || sucursalSeleccionada === null}
                 >
                   {sucursalSeleccionada === null && <option value="">Cargando...</option>}
@@ -610,10 +631,10 @@ export default function PuntoDeVenta() {
                         <div className="text-xs space-y-0.5">
                           <p className="text-gray-500">
                             {p.tipo === 'seco'
-                              ? `$${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? p.precio_minorista} / u.`
+                              ? `$${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? 0} / u.`
                               : (p.tipo === 'alimento'
-                                ? `$${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? p.precio_minorista}/kg`
-                                : `$${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? p.precio_minorista}/L • May: ${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_mayorista ?? p.precio_mayorista}/L`
+                                ? `$${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? 0}/kg`
+                                : `$${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? 0}/L • May: ${stocks.find(s => s.producto_id === p.id && s.sucursal_id === sucursalSeleccionada)?.precio_mayorista ?? 0}/L`
                               )
                             }
                           </p>
@@ -835,9 +856,9 @@ export default function PuntoDeVenta() {
                           success: true,
                           producto: prod.nombre,
                           litros: qty,
-                          precio_por_litro: stocks.find(s => s.producto_id === prod.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? prod.precio_minorista,
+                          precio_por_litro: stocks.find(s => s.producto_id === prod.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? 0,
                           tipo_precio: 'Unidad',
-                          total: qty * (stocks.find(s => s.producto_id === prod.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? prod.precio_minorista),
+                          total: qty * (stocks.find(s => s.producto_id === prod.id && s.sucursal_id === sucursalSeleccionada)?.precio_minorista ?? 0),
                           ahorro: 0,
                           isDry: true
                         });
@@ -935,8 +956,8 @@ export default function PuntoDeVenta() {
                         const producto = productos.find(p => p.id === productoSeleccionado);
 
                         const stockConfig = stocks.find(s => s.producto_id === productoSeleccionado && s.sucursal_id === sucursalSeleccionada);
-                        const pMinorista = stockConfig?.precio_minorista ?? producto?.precio_minorista ?? 0;
-                        const pMayorista = stockConfig?.precio_mayorista ?? producto?.precio_mayorista ?? pMinorista;
+                        const pMinorista = stockConfig?.precio_minorista ?? 0;
+                        const pMayorista = stockConfig?.precio_mayorista ?? 0;
 
                         if (litros > 0 && producto) {
                           const esMayorista = producto.tipo === 'alimento' ? false : litros >= (producto.litros_minimo_mayorista || 0);

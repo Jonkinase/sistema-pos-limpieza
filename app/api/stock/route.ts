@@ -7,8 +7,6 @@ export async function GET() {
     const productosResult = await db.query('SELECT * FROM productos WHERE activo = 1');
     const productos = productosResult.rows.map(p => ({
       ...p,
-      precio_minorista: parseFloat(p.precio_minorista),
-      precio_mayorista: p.precio_mayorista ? parseFloat(p.precio_mayorista) : null,
       litros_minimo_mayorista: p.litros_minimo_mayorista ? parseFloat(p.litros_minimo_mayorista) : null
     }));
 
@@ -95,7 +93,7 @@ export async function POST(request: NextRequest) {
     await db.query(`
       INSERT INTO stock (producto_id, sucursal_id, cantidad_litros, precio_minorista, precio_mayorista, activo)
       VALUES ($1, $2, $3, $4, $5, $6)
-      ON CONFLICT(producto_id, sucursal_id)
+      ON CONFLICT(producto_id)
       DO UPDATE SET 
         cantidad_litros = EXCLUDED.cantidad_litros,
         precio_minorista = COALESCE(EXCLUDED.precio_minorista, stock.precio_minorista),

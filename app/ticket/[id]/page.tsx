@@ -8,9 +8,14 @@ type Venta = {
   fecha: string;
   sucursal_id: number;
   sucursal_nombre: string;
+  sucursal_direccion: string | null;
   cliente_id: number | null;
   cliente_nombre: string | null;
   cliente_telefono: string | null;
+  negocio_nombre: string;
+  negocio_direccion: string | null;
+  negocio_telefono: string | null;
+  negocio_cuit: string | null;
   total: number;
   pagado: number;
   tipo_venta: string;
@@ -85,12 +90,28 @@ export default function TicketPage() {
           <>
             <div className="text-center border-b border-dashed pb-2 mb-2">
               <h1 className="text-lg font-bold tracking-wide">
-                Sistema de Limpieza
+                {venta.negocio_nombre}
               </h1>
-              <p className="text-xs text-gray-600">
-                Sucursal: {venta.sucursal_nombre}
+              {venta.negocio_direccion && (
+                <p className="text-xs text-gray-600">{venta.negocio_direccion}</p>
+              )}
+              {(venta.negocio_telefono || venta.negocio_cuit) && (
+                <p className="text-xs text-gray-600">
+                  {venta.negocio_telefono && <span>{venta.negocio_telefono}</span>}
+                  {venta.negocio_cuit && (
+                    <span className={venta.negocio_telefono ? "ml-2" : ""}>
+                      CUIT: {venta.negocio_cuit}
+                    </span>
+                  )}
+                </p>
+              )}
+              <p className="text-xs text-gray-600 mt-1">
+                {venta.sucursal_nombre}
               </p>
-              <p className="text-xs print:text-[10px] text-gray-500">
+              {venta.sucursal_direccion && (
+                <p className="text-xs text-gray-600">{venta.sucursal_direccion}</p>
+              )}
+              <p className="text-xs print:text-[10px] text-gray-500 mt-1">
                 Ticket #{venta.id} · {fechaFormateada}
               </p>
             </div>
