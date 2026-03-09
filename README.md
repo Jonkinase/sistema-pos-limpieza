@@ -186,8 +186,4 @@ lib/
 middleware.ts
 ```
 
-## Estado para GitHub
 
-Este README representa el estado actual real del proyecto y está listo para publicación.
-
-Si quieres, el siguiente paso natural es agregar una sección de **capturas de pantalla** por módulo (`/public`) para mejorar la presentación del repositorio.
