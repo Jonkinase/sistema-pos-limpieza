@@ -1,133 +1,193 @@
-# 🧼 Sistema de Punto de Venta - Productos de Limpieza
+# Sistema POS de Limpieza
 
-Sistema web de gestión de ventas desarrollado con Next.js, React y SQLite para negocios de productos de limpieza a granel.
+Sistema web de punto de venta para productos de limpieza, con soporte multisucursal, cuentas corrientes, inventario por local, presupuestos y reportes.
 
-## 🚀 Características Principales
+## Estado actual del sistema
 
-### ✅ Ventas Inteligentes
-- Cálculo automático de litros por monto en pesos
-- **Precio mayorista automático** cuando se superan los 5 litros
-- Carrito de compras con detalle de precios
-- Ventas al contado y a crédito (fiado)
+Este repositorio está **operativo** y en uso con los siguientes módulos:
 
-### 💳 Cuentas Corrientes
-- Registro de clientes
-- Seguimiento de deudas
-- Pagos parciales
-- Historial completo de pagos
+- Ventas (contado y fiado) con carrito e historial.
+- Cuentas corrientes (clientes, saldo, pagos).
+- Presupuestos (guardar, convertir a venta, descargar PDF).
+- Inventario por sucursal (stock, precios por local, estado activo/inactivo).
+- Gestión de usuarios (admin, encargado, vendedor).
+- Dashboard con métricas comerciales.
+- Ticket de venta con vista para impresión.
+- Reportes de ventas y deudas en CSV compatible con Excel.
 
-### 📄 Presupuestos
-- Guardar cotizaciones
-- Generación de PDF profesional
-- Conversión de presupuesto a venta
+Además, ya se aplicaron mejoras responsive clave:
 
-### 🏪 Multisucursal
-- Gestión de 2 locales independientes
-- Stock por sucursal (próximamente)
+- Vista en **tarjetas para móvil** en historial de ventas.
+- Vista en **tarjetas para móvil** en productos de inventario.
+- Vista en **tarjetas para móvil** en usuarios.
+- Ajustes de tipografía y controles para mejor legibilidad en pantallas chicas.
 
-### 📊 Dashboard
-- Estadísticas de ventas (día/mes)
-- Top productos más vendidos
-- Análisis contado vs fiado
-- Deudas pendientes
+## Stack técnico
 
-## 🛠️ Tecnologías Utilizadas
+- Next.js 16 (App Router)
+- React 19 + TypeScript
+- Tailwind CSS 4
+- PostgreSQL (`pg`)
+- Autenticación JWT (cookie httpOnly)
+- Exportaciones PDF con `jsPDF`
 
-- **Frontend:** Next.js 16, React, TypeScript
-- **Estilos:** Tailwind CSS
-- **Base de Datos:** SQLite (better-sqlite3)
-- **PDF:** jsPDF
+## Arquitectura general
 
-## 📦 Instalación
+- Frontend y backend en el mismo proyecto (`app/` + `app/api/`).
+- Base de datos inicializada automáticamente desde `lib/db/database.ts`.
+- Middleware de autenticación en `middleware.ts`.
+- Componentes UI reutilizables en `components/`.
 
-### Requisitos Previos
-- Node.js 18+ 
+## Módulos de la app
+
+### 1) Principal (`/`)
+
+- Flujo de venta con carrito.
+- Cálculo por pesos/litros y tipo de producto.
+- Integración con stock por sucursal.
+- Historial de ventas (cards en móvil, tabla en desktop).
+
+### 2) Inventario (`/inventario`)
+
+- Alta/edición de productos.
+- Precios minorista/mayorista por sucursal.
+- Activación/desactivación por local.
+- Listado de productos (cards en móvil, tabla en desktop).
+- Exportación de tabla de precios a PDF.
+
+### 3) Clientes (`/clientes`)
+
+- Alta de cliente.
+- Visualización de saldo.
+- Registro de pagos.
+- Historial de pagos.
+
+### 4) Presupuestos (`/presupuestos`)
+
+- Consulta de presupuestos.
+- Conversión a venta.
+- Eliminación de presupuesto.
+- Descarga de PDF.
+
+### 5) Usuarios (`/usuarios`)
+
+- Alta y eliminación de usuarios.
+- Restricciones por rol (admin/encargado).
+- Listado responsive (cards en móvil, tabla en desktop).
+
+### 6) Dashboard (`/dashboard`)
+
+- Ventas del día y del mes.
+- Deudas pendientes.
+- Presupuestos.
+- Top productos y ventas por tipo.
+
+### 7) Ticket (`/ticket/[id]`)
+
+- Vista de ticket para pantalla.
+- Estilos específicos para impresión.
+
+## API (resumen)
+
+Principales rutas:
+
+- Auth: `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`
+- Ventas: `/api/ventas`, `/api/ventas/[id]`
+- Productos: `/api/productos`
+- Stock: `/api/stock`
+- Clientes: `/api/clientes`
+- Pagos: `/api/pagos`
+- Presupuestos: `/api/presupuestos`, `/api/presupuestos/[id]`
+- Usuarios: `/api/usuarios`
+- Estadísticas: `/api/estadisticas`
+- Reportes: `/api/reportes/ventas`, `/api/reportes/deudas`
+- Utilidades: `/api/calcular-venta`, `/api/init`
+
+## Requisitos
+
+- Node.js 18+
+- PostgreSQL 14+ (recomendado)
 - npm
 
-### Pasos de Instalación
+## Configuración local
 
-1. Clonar el repositorio:
+1. Clonar repo:
+
 ```bash
-git clone https://github.com/Jonkinase/sistema-pos-limpieza.git
+git clone <TU_REPO_URL>
 cd sistema-pos-limpieza
 ```
 
 2. Instalar dependencias:
+
 ```bash
 npm install
 ```
 
-3. Iniciar el servidor de desarrollo:
+3. Crear `.env` (basado en `.env.example`):
+
+```env
+DATABASE_URL=postgresql://usuario:password@localhost:5432/pos_limpieza
+AUTH_SECRET=cambia_este_secreto_en_produccion
+```
+
+Nota: actualmente el código usa `AUTH_SECRET` en `lib/auth.ts`.
+
+4. Levantar en desarrollo:
+
 ```bash
 npm run dev
 ```
 
-4. Abrir en el navegador:
+5. Abrir:
+
+- `http://localhost:3000`
+
+## Inicialización de base de datos
+
+- El esquema se crea automáticamente al iniciar la app (por `initDatabase()` en `lib/db/database.ts`).
+- También existe la ruta `GET /api/init` para forzar inicialización.
+
+## Usuario inicial por defecto
+
+Si la tabla `usuarios` está vacía, se crea automáticamente:
+
+- Email: `admin@sistema.com`
+- Password: `admin123`
+- Rol: `admin`
+
+## Scripts
+
+```bash
+npm run dev    # Desarrollo
+npm run build  # Build producción
+npm run start  # Run producción
+npm run lint   # Lint
 ```
-http://localhost:3000
+
+## Estructura de carpetas
+
+```text
+app/
+  api/
+  clientes/
+  dashboard/
+  inventario/
+  login/
+  presupuestos/
+  ticket/[id]/
+  usuarios/
+  page.tsx
+components/
+  SalesTable.tsx
+lib/
+  auth.ts
+  db/database.ts
+middleware.ts
 ```
 
-## 📂 Estructura del Proyecto
-```
-sistema-limpieza/
-├── app/
-│   ├── api/              # Rutas API
-│   │   ├── clientes/     # Gestión de clientes
-│   │   ├── ventas/       # Registro de ventas
-│   │   ├── presupuestos/ # Presupuestos
-│   │   ├── pagos/        # Pagos de deudas
-│   │   └── estadisticas/ # Dashboard
-│   ├── clientes/         # Página de cuentas corrientes
-│   ├── presupuestos/     # Página de presupuestos
-│   ├── dashboard/        # Panel de estadísticas
-│   └── page.tsx          # Página principal (ventas)
-├── lib/
-│   └── db/
-│       └── database.ts   # Configuración de SQLite
-└── datos-limpieza.db     # Base de datos local
-```
+## Estado para GitHub
 
-## 🎯 Uso del Sistema
+Este README representa el estado actual real del proyecto y está listo para publicación.
 
-### Realizar una Venta
-1. Seleccionar sucursal
-2. Elegir producto
-3. Ingresar monto en pesos
-4. El sistema calcula litros y aplica precio mayorista si corresponde
-5. Agregar al carrito
-6. Finalizar como venta contado o fiado
-
-### Gestionar Cuentas Corrientes
-1. Ir a "Cuentas Corrientes"
-2. Crear cliente
-3. Realizar ventas a crédito
-4. Registrar pagos parciales
-
-### Crear Presupuesto
-1. Agregar productos al carrito
-2. Clic en "Guardar como Presupuesto"
-3. Descargar PDF
-4. Convertir a venta cuando el cliente confirme
-
-## 📊 Reglas de Negocio
-
-- **Precio Minorista:** Hasta 4.99 litros
-- **Precio Mayorista:** 5 litros o más (aplica automáticamente)
-- **Cálculo:** El sistema primero calcula con precio minorista, si supera 5L, recalcula con mayorista
-
-## 🔮 Próximas Mejoras
-
-- [ ] Gestión de inventario/stock
-- [ ] Reportes exportables (Excel/PDF)
-- [ ] Impresión de tickets de venta
-- [ ] Backup automático de base de datos
-- [ ] Migración a PostgreSQL
-- [ ] Sistema de autenticación
-
-## 📝 Licencia
-
-Este proyecto fue desarrollado para uso personal/comercial.
-
-## 👨‍💻 Autor
-
-Desarrollado por Tomas Falco
+Si quieres, el siguiente paso natural es agregar una sección de **capturas de pantalla** por módulo (`/public`) para mejorar la presentación del repositorio.
