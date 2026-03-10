@@ -89,52 +89,64 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                 </div>
             }
         >
-            <div className="md:hidden space-y-3">
+            {/* Mobile View */}
+            <div className="md:hidden space-y-4">
                 {loading ? (
                     <div className="text-center py-4">Cargando ventas...</div>
                 ) : ventas.length === 0 ? (
                     <div className="text-center py-4 text-gray-500">No hay ventas registradas en esta sucursal</div>
                 ) : (
                     ventas.map((venta) => (
-                        <div key={venta.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                            <div className="flex justify-between items-start gap-2 mb-2">
-                                <div>
-                                    <p className="font-bold text-blue-600">#{venta.id}</p>
-                                    <p className="text-xs text-gray-600">{new Date(venta.fecha).toLocaleString()}</p>
+                        <Card key={venta.id} className="!p-4 border border-gray-200 shadow-sm">
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-start pb-2 border-b border-gray-100">
+                                    <div>
+                                        <p className="font-bold text-blue-600">#{venta.id}</p>
+                                        <p className="text-xs text-gray-500">{new Date(venta.fecha).toLocaleString()}</p>
+                                    </div>
+                                    <p className="font-bold text-gray-900">${venta.total.toFixed(2)}</p>
                                 </div>
-                                <p className="font-bold text-black">${venta.total.toFixed(2)}</p>
-                            </div>
 
-                            <p className="text-sm text-black mb-1">
-                                <span className="font-semibold">Cliente:</span>{' '}
-                                {venta.cliente_nombre || <span className="italic">Consumidor Final</span>}
-                                {venta.tipo_venta === 'fiado' && (
-                                    <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-800 border border-orange-200">
-                                        Fiado
-                                    </span>
-                                )}
-                            </p>
-                            <p className="text-sm text-gray-700 mb-1">
-                                <span className="font-semibold">Vendedor:</span> {venta.vendedor_nombre || '-'}
-                            </p>
-                            <p className="text-sm text-gray-700 mb-3 break-words">
-                                <span className="font-semibold">Items:</span> {venta.items_resumen}
-                            </p>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500 font-semibold">Cliente:</span>
+                                    <div className="text-right">
+                                        <span className="text-gray-900 font-medium">
+                                            {venta.cliente_nombre || <span className="italic">Consumidor Final</span>}
+                                        </span>
+                                        {venta.tipo_venta === 'fiado' && (
+                                            <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-800 border border-orange-200">
+                                                Fiado
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
 
-                            <div className="flex flex-wrap gap-1 pt-2 border-t border-gray-200">
-                                <Button variant="ghost" size="sm" onClick={() => setSelectedSale(venta)}>👁️ Ver</Button>
-                                {onEdit && isAdminOrEncargado && (
-                                    <Button variant="warning" size="sm" onClick={() => onEdit(venta)}>✏️ Editar</Button>
-                                )}
-                                {isAdminOrEncargado && (
-                                    <Button variant="danger" size="sm" onClick={() => handleDelete(venta)}>🗑️ Eliminar</Button>
-                                )}
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-500 font-semibold">Vendedor:</span>
+                                    <span className="text-gray-900 font-medium">{venta.vendedor_nombre || '-'}</span>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <span className="text-xs text-gray-500 font-bold uppercase">Items:</span>
+                                    <p className="text-sm text-gray-700 break-words leading-tight">{venta.items_resumen}</p>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
+                                    <Button variant="ghost" size="sm" onClick={() => setSelectedSale(venta)}>👁️ Ver Detalle</Button>
+                                    {onEdit && isAdminOrEncargado && (
+                                        <Button variant="warning" size="sm" onClick={() => onEdit(venta)}>✏️ Editar</Button>
+                                    )}
+                                    {isAdminOrEncargado && (
+                                        <Button variant="danger" size="sm" onClick={() => handleDelete(venta)}>🗑️ Eliminar</Button>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        </Card>
                     ))
                 )}
             </div>
 
+            {/* Desktop View */}
             <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm text-left">
                     <thead className="text-xs sm:text-sm text-gray-700 uppercase bg-gray-50 border-b">

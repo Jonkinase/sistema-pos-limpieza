@@ -121,35 +121,44 @@ export default function UsuariosPage() {
                     />
 
                     <Card className="lg:col-span-2" title="Usuarios Registrados">
+                        {/* Mobile View */}
                         <div className="md:hidden space-y-3">
                             {usuarios.map(u => (
-                                <div key={u.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                    <div className="mb-2">
-                                        <p className="font-bold text-gray-900">{u.nombre}</p>
-                                        <p className="text-sm text-gray-500">{u.email}</p>
+                                <Card key={u.id} className="!p-4 border border-gray-200 shadow-sm">
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-start pb-2 border-b border-gray-100">
+                                            <div>
+                                                <p className="font-bold text-gray-900">{u.nombre}</p>
+                                                <p className="text-sm text-gray-500">{u.email}</p>
+                                            </div>
+                                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${u.rol === 'admin'
+                                                ? 'bg-purple-100 text-purple-700'
+                                                : 'bg-blue-100 text-blue-700'
+                                                }`}>
+                                                {u.rol === 'admin' ? 'Admin' : u.rol === 'encargado' ? 'Encargado' : 'Vendedor'}
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-500">Sucursal:</span>
+                                            <span className="font-medium text-gray-900">{u.sucursal_nombre || '-'}</span>
+                                        </div>
+
+                                        <div className="pt-2 border-t border-gray-100 flex justify-end">
+                                            <Button 
+                                                variant="danger" 
+                                                size="sm" 
+                                                onClick={() => handleDelete(u.id)}
+                                            >
+                                                🗑️ Eliminar Usuario
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center justify-between gap-2 mb-3">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${u.rol === 'admin'
-                                            ? 'bg-purple-100 text-purple-700'
-                                            : 'bg-blue-100 text-blue-700'
-                                            }`}>
-                                            {u.rol === 'admin' ? 'Administrador' : u.rol === 'encargado' ? 'Encargado' : 'Vendedor'}
-                                        </span>
-                                        <span className="text-sm text-gray-600">{u.sucursal_nombre || '-'}</span>
-                                    </div>
-                                    <div className="pt-2 border-t border-gray-200">
-                                        <Button 
-                                            variant="danger" 
-                                            size="sm" 
-                                            onClick={() => handleDelete(u.id)}
-                                        >
-                                            🗑️ Eliminar
-                                        </Button>
-                                    </div>
-                                </div>
+                                </Card>
                             ))}
                         </div>
 
+                        {/* Desktop View */}
                         <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-gray-50 text-gray-500 uppercase text-xs">

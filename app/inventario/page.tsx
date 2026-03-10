@@ -166,7 +166,68 @@ export default function InventarioPage() {
             <div className="text-right text-sm text-gray-500">{productosFiltrados.length} productos</div>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile View */}
+          <div className="md:hidden space-y-4">
+            {productosFiltrados.map(p => {
+              const config = obtenerConfig(p.id);
+              return (
+                <Card key={p.id} className="!p-4 border border-gray-200 shadow-sm">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                      <span className="font-bold text-gray-800">{p.nombre}</span>
+                      <span className="text-xs px-2 py-1 bg-emerald-100 text-emerald-800 rounded-full font-medium capitalize">
+                        {p.tipo || 'Líquido'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">P. Minorista:</span>
+                      <span className="font-bold text-gray-900">${Number(config?.precio_minorista || 0).toFixed(2)}</span>
+                    </div>
+                    
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">P. Mayorista:</span>
+                      <span className="font-bold text-gray-900">
+                        {config?.precio_mayorista ? `$${Number(config.precio_mayorista).toFixed(2)}` : '-'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Stock:</span>
+                      <span className="font-bold text-emerald-700">
+                        {p.tipo === 'seco' ? Math.floor(config?.cantidad_litros || 0) : (config?.cantidad_litros || 0).toFixed(2)}
+                        <span className="text-xs ml-1 text-gray-400 font-normal">
+                          {p.tipo === 'seco' ? 'u.' : (p.tipo === 'alimento' ? 'kg' : 'L')}
+                        </span>
+                      </span>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 mt-2">
+                      <Button variant="primary" size="sm" onClick={() => { 
+                        setIsEditing(true); setProductoEditando(p);
+                        setFormProducto({
+                          nombre: p.nombre, tipo: p.tipo || 'liquido', 
+                          precio_minorista: (config?.precio_minorista || 0).toString(),
+                          precio_mayorista: (config?.precio_mayorista || 0).toString(),
+                          litros_minimo_mayorista: (p.litros_minimo_mayorista || 5).toString(),
+                          stock_actual: (config?.cantidad_litros || 0).toString()
+                        });
+                        setModalFormOpen(true);
+                      }}>✏️ Editar</Button>
+                      <Button variant="danger" size="sm" onClick={() => {
+                        if (confirm(`¿Eliminar ${p.nombre}?`)) {
+                          eliminarProductoMutation.mutate(p.id);
+                        }
+                      }}>🗑️ Eliminar</Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Desktop View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
               <thead className="bg-emerald-50 text-xs sm:text-sm">
                 <tr>
