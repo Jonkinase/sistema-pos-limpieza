@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Venta } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Dialog } from '@/components/ui/Dialog';
+import { api } from '@/lib/api';
 
 interface SalesTableProps {
     sucursalId: number;
@@ -15,47 +18,36 @@ interface SalesTableProps {
 }
 
 export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDeleteSuccess, onEdit }: SalesTableProps) {
-    const [ventas, setVentas] = useState<Venta[]>([]);
-    const [loading, setLoading] = useState(false);
+    const queryClient = useQueryClient();
     const [selectedSale, setSelectedSale] = useState<Venta | null>(null);
 
     const today = new Date().toISOString().split('T')[0];
     const [fechaDesde, setFechaDesde] = useState(today);
     const [fechaHasta, setFechaHasta] = useState(today);
 
-    useEffect(() => {
-        if (!sucursalId) return;
+    const { data, isLoading: loading } = useQuery({
+        queryKey: ['ventas', sucursalId, refreshTrigger, fechaDesde, fechaHasta],
+        queryFn: () => api.ventas.getAll(sucursalId, fechaDesde, fechaHasta),
+        enabled: !!sucursalId
+    });
 
-        setLoading(true);
-        fetch(`/api/ventas?sucursal_id=${sucursalId}&fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    setVentas(data.ventas);
-                }
-            })
-            .finally(() => setLoading(false));
-    }, [sucursalId, refreshTrigger, fechaDesde, fechaHasta]);
+    const ventas = data?.ventas || [];
 
-    const handleDelete = async (venta: Venta) => {
+    const deleteVentaMutation = useMutation({
+        mutationFn: api.ventas.delete,
+        onSuccess: () => {
+            toast.success('Venta eliminada correctamente');
+            if (onDeleteSuccess) onDeleteSuccess();
+            queryClient.invalidateQueries({ queryKey: ['ventas'] });
+        },
+        onError: (err: Error) => toast.error(err.message || 'Error al eliminar venta')
+    });
+
+    const handleDelete = (venta: Venta) => {
         if (!confirm(`¿Estás seguro de ELIMINAR la venta #${venta.id}?\n\n⚠️ Esto devolverá el stock y ajustará la deuda del cliente si corresponde.`)) {
             return;
         }
-
-        try {
-            const res = await fetch(`/api/ventas?id=${venta.id}`, { method: 'DELETE' });
-            const data = await res.json();
-
-            if (data.success) {
-                alert('✅ Venta eliminada correctamente');
-                setVentas(prev => prev.filter(v => v.id !== venta.id));
-                if (onDeleteSuccess) onDeleteSuccess();
-            } else {
-                alert('❌ Error: ' + data.error);
-            }
-        } catch (error) {
-            alert('❌ Error al eliminar venta');
-        }
+        deleteVentaMutation.mutate(venta.id);
     };
 
     const isAdminOrEncargado = userRole === 'admin' || userRole === 'encargado';

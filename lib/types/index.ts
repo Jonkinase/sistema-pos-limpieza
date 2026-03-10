@@ -45,6 +45,7 @@ export type Venta = {
     vendedor_nombre: string | null;
     items_count: number;
     items_resumen: string;
+    sucursal_id: number;
 };
 
 export type User = {

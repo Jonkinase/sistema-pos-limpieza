@@ -3,22 +3,20 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import jsPDF from 'jspdf';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { InventoryForm } from '@/components/inventory/InventoryForm';
 import { Producto, Sucursal, Stock, User } from '@/lib/types';
+import { api } from '@/lib/api';
 
 export default function InventarioPage() {
   const router = useRouter();
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
-  const [stocks, setStocks] = useState<Stock[]>([]);
+  const queryClient = useQueryClient();
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<number | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [guardando, setGuardando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('todos');
 
@@ -38,92 +36,108 @@ export default function InventarioPage() {
     setFormProducto(prev => ({ ...prev, [field]: value }));
   };
 
-  const recargarDatos = (sucursalId: number) => {
-    fetch(`/api/productos?sucursal_id=${sucursalId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setProductos(data.productos || []);
-          setSucursales(data.sucursales || []);
-          setStocks(data.stocks || []);
-        }
-      });
-  };
+  const { data: authData, isError: isAuthError } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: api.auth.me,
+    retry: false
+  });
+  const user = authData?.user || null;
+
+  if (isAuthError || (user && user.rol !== 'admin' && user.rol !== 'encargado')) {
+    router.push('/');
+  }
+
+  const { data: stockData } = useQuery({
+    queryKey: ['stockInit'],
+    queryFn: api.stock.getAll,
+    enabled: !!user
+  });
+  const sucursales = stockData?.sucursales || [];
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then(res => res.json())
-      .then(data => {
-        if (!data.success || (data.user.rol !== 'admin' && data.user.rol !== 'encargado')) {
-          router.push('/');
-        } else {
-          setUser(data.user);
-          if (data.user.rol !== 'admin' && data.user.sucursal_id) setSucursalSeleccionada(data.user.sucursal_id);
-        }
-      })
-      .catch(() => router.push('/'));
+    if (user && sucursales.length > 0 && !sucursalSeleccionada) {
+      if (user.rol !== 'admin' && user.sucursal_id) {
+        setTimeout(() => setSucursalSeleccionada(user.sucursal_id!), 0);
+      } else {
+        setTimeout(() => setSucursalSeleccionada(sucursales[0].id), 0);
+      }
+    }
+  }, [user, sucursales, sucursalSeleccionada]);
 
-    fetch('/api/stock')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setSucursales(data.sucursales || []);
-          const initial = sucursalSeleccionada ?? (data.sucursales?.[0]?.id || null);
-          if (initial) {
-            setSucursalSeleccionada(initial);
-            recargarDatos(initial);
-          }
-        }
-      });
-  }, []);
-
-  useEffect(() => {
-    if (sucursalSeleccionada) recargarDatos(sucursalSeleccionada);
-  }, [sucursalSeleccionada]);
+  const { data: productosData } = useQuery({
+    queryKey: ['productos', sucursalSeleccionada],
+    queryFn: () => api.productos.getAll(sucursalSeleccionada!),
+    enabled: !!sucursalSeleccionada
+  });
+  const productos = productosData?.productos || [];
+  const stocks = productosData?.stocks || [];
 
   const obtenerConfig = (pId: number) => stocks.find(s => s.producto_id === pId && s.sucursal_id === sucursalSeleccionada);
 
-  const handleSave = async () => {
-    if (!formProducto.nombre || !formProducto.precio_minorista) return alert('Campos obligatorios');
-    setGuardando(true);
-    try {
-      if (isEditing && productoEditando) {
-        await fetch('/api/productos', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: productoEditando.id, nombre: formProducto.nombre, tipo: formProducto.tipo, litros_minimo_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.litros_minimo_mayorista) : null })
-        });
-        await fetch('/api/stock', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            producto_id: productoEditando.id,
-            sucursal_id: sucursalSeleccionada,
-            cantidad_litros: parseFloat(formProducto.stock_actual),
-            precio_minorista: parseFloat(formProducto.precio_minorista),
-            precio_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : parseFloat(formProducto.precio_minorista),
-            activo: 1
-          })
-        });
-      } else {
-        await fetch('/api/productos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nombre: formProducto.nombre,
-            tipo: formProducto.tipo,
-            precio_minorista: parseFloat(formProducto.precio_minorista),
-            precio_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : (formProducto.tipo === 'alimento' ? parseFloat(formProducto.precio_minorista) : null),
-            litros_minimo_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.litros_minimo_mayorista) : null,
-            stock_inicial: parseFloat(formProducto.stock_actual || '0'),
-            sucursal_id: sucursalSeleccionada
-          })
-        });
-      }
-      alert('Operación exitosa'); setModalFormOpen(false); recargarDatos(sucursalSeleccionada!);
-    } catch (e) { alert('Error al guardar'); }
-    setGuardando(false);
+  const crearProductoMutation = useMutation({
+    mutationFn: async (data: Parameters<typeof api.productos.create>[0]) => api.productos.create(data),
+    onSuccess: () => {
+      toast.success('Producto creado exitosamente');
+      setModalFormOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['productos', sucursalSeleccionada] });
+    },
+    onError: (err: Error) => toast.error(err.message || 'Error al crear producto')
+  });
+
+  const editarProductoMutation = useMutation({
+    mutationFn: async (data: { prod: Partial<Producto>, stock: Partial<Stock> }) => {
+      await api.productos.update(data.prod);
+      await api.stock.update(data.stock);
+    },
+    onSuccess: () => {
+      toast.success('Producto actualizado exitosamente');
+      setModalFormOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['productos', sucursalSeleccionada] });
+    },
+    onError: (err: Error) => toast.error(err.message || 'Error al actualizar producto')
+  });
+
+  const eliminarProductoMutation = useMutation({
+    mutationFn: api.productos.delete,
+    onSuccess: () => {
+      toast.success('Producto eliminado exitosamente');
+      queryClient.invalidateQueries({ queryKey: ['productos', sucursalSeleccionada] });
+    },
+    onError: (err: Error) => toast.error(err.message || 'Error al eliminar producto')
+  });
+
+  const handleSave = () => {
+    if (!formProducto.nombre || !formProducto.precio_minorista) {
+      toast.error('Nombre y Precio Minorista son obligatorios');
+      return;
+    }
+    
+    if (isEditing && productoEditando) {
+      editarProductoMutation.mutate({
+        prod: { id: productoEditando.id, nombre: formProducto.nombre, tipo: formProducto.tipo, litros_minimo_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.litros_minimo_mayorista) : undefined },
+        stock: {
+          producto_id: productoEditando.id,
+          sucursal_id: sucursalSeleccionada!,
+          cantidad_litros: parseFloat(formProducto.stock_actual),
+          precio_minorista: parseFloat(formProducto.precio_minorista),
+          precio_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : parseFloat(formProducto.precio_minorista),
+          activo: 1
+        }
+      });
+    } else {
+      crearProductoMutation.mutate({
+        nombre: formProducto.nombre,
+        tipo: formProducto.tipo,
+        precio_minorista: parseFloat(formProducto.precio_minorista),
+        precio_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : (formProducto.tipo === 'alimento' ? parseFloat(formProducto.precio_minorista) : null),
+        litros_minimo_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.litros_minimo_mayorista) : undefined,
+        stock_inicial: parseFloat(formProducto.stock_actual || '0'),
+        sucursal_id: sucursalSeleccionada!
+      });
+    }
   };
+
+  const isPending = crearProductoMutation.isPending || editarProductoMutation.isPending;
 
   const productosFiltrados = productos
     .filter(p => p.nombre.toLowerCase().includes(busqueda.toLowerCase()) && (filtroTipo === 'todos' || (filtroTipo === 'liquido' && (p.tipo === 'liquido' || !p.tipo)) || p.tipo === filtroTipo))
@@ -191,10 +205,9 @@ export default function InventarioPage() {
                           });
                           setModalFormOpen(true);
                         }}>✏️</Button>
-                        <Button variant="danger" size="sm" onClick={async () => {
+                        <Button variant="danger" size="sm" onClick={() => {
                           if (confirm(`¿Eliminar ${p.nombre}?`)) {
-                            const res = await fetch(`/api/productos?id=${p.id}`, { method: 'DELETE' });
-                            if ((await res.json()).success) recargarDatos(sucursalSeleccionada!);
+                            eliminarProductoMutation.mutate(p.id);
                           }
                         }}>🗑️</Button>
                       </td>
@@ -216,7 +229,7 @@ export default function InventarioPage() {
             formProducto={formProducto} 
             onFormChange={handleFormChange} 
             onSave={handleSave} 
-            loading={guardando} 
+            loading={isPending} 
           />
         )}
       </div>
