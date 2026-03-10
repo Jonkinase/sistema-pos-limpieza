@@ -1,26 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-type Venta = {
-    id: number;
-    fecha: string;
-    total: number;
-    tipo_venta: string;
-    cliente_nombre: string | null;
-    vendedor_nombre: string | null;
-    items_count: number;
-    items_resumen: string;
-};
-
-// ... (imports remain)
+import { Venta } from '@/lib/types';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Dialog } from '@/components/ui/Dialog';
 
 interface SalesTableProps {
     sucursalId: number;
     refreshTrigger: number;
     userRole?: string;
     onDeleteSuccess?: () => void;
-    onEdit?: (venta: Venta) => void; // Nueva prop
+    onEdit?: (venta: Venta) => void;
 }
 
 export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDeleteSuccess, onEdit }: SalesTableProps) {
@@ -28,12 +19,10 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
     const [loading, setLoading] = useState(false);
     const [selectedSale, setSelectedSale] = useState<Venta | null>(null);
 
-    // Filtros de fecha (valor por defecto: hoy)
     const today = new Date().toISOString().split('T')[0];
     const [fechaDesde, setFechaDesde] = useState(today);
     const [fechaHasta, setFechaHasta] = useState(today);
 
-    // ... (useEffect remains same) ...
     useEffect(() => {
         if (!sucursalId) return;
 
@@ -48,7 +37,6 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
             .finally(() => setLoading(false));
     }, [sucursalId, refreshTrigger, fechaDesde, fechaHasta]);
 
-    // Eliminar venta
     const handleDelete = async (venta: Venta) => {
         if (!confirm(`¿Estás seguro de ELIMINAR la venta #${venta.id}?\n\n⚠️ Esto devolverá el stock y ajustará la deuda del cliente si corresponde.`)) {
             return;
@@ -60,12 +48,8 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
 
             if (data.success) {
                 alert('✅ Venta eliminada correctamente');
-                // Recargar ventas
                 setVentas(prev => prev.filter(v => v.id !== venta.id));
-                // Avisar al padre para recargar stocks
-                if (onDeleteSuccess) {
-                    onDeleteSuccess();
-                }
+                if (onDeleteSuccess) onDeleteSuccess();
             } else {
                 alert('❌ Error: ' + data.error);
             }
@@ -74,13 +58,13 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
         }
     };
 
-    return (
-        <div className="bg-white rounded-2xl shadow-lg p-6 mt-6 text-black">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h2 className="text-2xl font-bold text-black">
-                    📋 Historial de Ventas - {ventas.length > 0 ? 'Movimientos' : 'Sin ventas'}
-                </h2>
+    const isAdminOrEncargado = userRole === 'admin' || userRole === 'encargado';
 
+    return (
+        <Card 
+            className="mt-6 text-black" 
+            title={ventas.length > 0 ? '📋 Historial de Ventas - Movimientos' : '📋 Historial de Ventas - Sin ventas'}
+            headerAction={
                 <div className="flex flex-wrap items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100">
                     <div className="flex items-center gap-2">
                         <label className="text-xs sm:text-sm font-bold text-black uppercase">Desde:</label>
@@ -100,18 +84,19 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                             className="text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5 text-black bg-white"
                         />
                     </div>
-                    <button
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => {
                             setFechaDesde(today);
                             setFechaHasta(today);
                         }}
-                        className="text-xs sm:text-sm bg-white hover:bg-gray-100 text-black font-bold py-1.5 px-3 rounded-lg border border-gray-200 transition"
                     >
                         Hoy
-                    </button>
+                    </Button>
                 </div>
-            </div>
-
+            }
+        >
             <div className="md:hidden space-y-3">
                 {loading ? (
                     <div className="text-center py-4">Cargando ventas...</div>
@@ -145,29 +130,12 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                             </p>
 
                             <div className="flex flex-wrap gap-1 pt-2 border-t border-gray-200">
-                                <button
-                                    onClick={() => setSelectedSale(venta)}
-                                    className="text-blue-500 hover:text-blue-700 font-medium text-xs px-2 py-1 min-h-[36px] bg-blue-50 rounded hover:bg-blue-100 transition"
-                                >
-                                    👁️ Ver
-                                </button>
-
-                                {onEdit && (userRole === 'admin' || userRole === 'encargado') && (
-                                    <button
-                                        onClick={() => onEdit(venta)}
-                                        className="text-orange-500 hover:text-orange-700 font-medium text-xs px-2 py-1 min-h-[36px] bg-orange-50 rounded hover:bg-orange-100 transition"
-                                    >
-                                        ✏️ Editar
-                                    </button>
+                                <Button variant="ghost" size="sm" onClick={() => setSelectedSale(venta)}>👁️ Ver</Button>
+                                {onEdit && isAdminOrEncargado && (
+                                    <Button variant="warning" size="sm" onClick={() => onEdit(venta)}>✏️ Editar</Button>
                                 )}
-
-                                {(userRole === 'admin' || userRole === 'encargado') && (
-                                    <button
-                                        onClick={() => handleDelete(venta)}
-                                        className="text-red-500 hover:text-red-700 font-medium text-xs px-2 py-1 min-h-[36px] bg-red-50 rounded hover:bg-red-100 transition"
-                                    >
-                                        🗑️ Eliminar
-                                    </button>
+                                {isAdminOrEncargado && (
+                                    <Button variant="danger" size="sm" onClick={() => handleDelete(venta)}>🗑️ Eliminar</Button>
                                 )}
                             </div>
                         </div>
@@ -189,66 +157,33 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                     </thead>
                     <tbody>
                         {loading ? (
-                            <tr>
-                                <td colSpan={6} className="text-center py-4">Cargando ventas...</td>
-                            </tr>
+                            <tr><td colSpan={6} className="text-center py-4">Cargando ventas...</td></tr>
                         ) : ventas.length === 0 ? (
-                            <tr>
-                                <td colSpan={6} className="text-center py-4 text-gray-500">No hay ventas registradas en esta sucursal</td>
-                            </tr>
+                            <tr><td colSpan={6} className="text-center py-4 text-gray-500">No hay ventas registradas</td></tr>
                         ) : (
                             ventas.map((venta) => (
                                 <tr key={venta.id} className="bg-white border-b hover:bg-gray-50">
                                     <td className="px-4 py-3">
                                         <span className="font-bold text-blue-600">#{venta.id}</span>
                                         <br />
-                                        <span className="text-black text-xs">
-                                            {new Date(venta.fecha).toLocaleString()}
-                                        </span>
+                                        <span className="text-black text-xs">{new Date(venta.fecha).toLocaleString()}</span>
                                     </td>
                                     <td className="px-4 py-3">
-                                        {venta.cliente_nombre || (
-                                            <span className="text-black italic">Consumidor Final</span>
-                                        )}
+                                        {venta.cliente_nombre || <span className="text-black italic">Consumidor Final</span>}
                                         {venta.tipo_venta === 'fiado' && (
-                                            <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-800 border border-orange-200">
-                                                Fiado
-                                            </span>
+                                            <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-800 border border-orange-200">Fiado</span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-3">
-                                        {venta.vendedor_nombre || '-'}
-                                    </td>
-                                    <td className="px-4 py-3 text-black truncate max-w-[200px]" title={venta.items_resumen}>
-                                        {venta.items_resumen}
-                                    </td>
-                                    <td className="px-4 py-3 text-right font-bold text-black">
-                                        ${venta.total.toFixed(2)}
-                                    </td>
+                                    <td className="px-4 py-3">{venta.vendedor_nombre || '-'}</td>
+                                    <td className="px-4 py-3 text-black truncate max-w-[200px]" title={venta.items_resumen}>{venta.items_resumen}</td>
+                                    <td className="px-4 py-3 text-right font-bold text-black">${venta.total.toFixed(2)}</td>
                                     <td className="px-4 py-3 flex flex-wrap gap-1">
-                                        <button
-                                            onClick={() => setSelectedSale(venta)}
-                                            className="text-blue-500 hover:text-blue-700 font-medium text-xs px-2 py-1 min-h-[36px] bg-blue-50 rounded hover:bg-blue-100 transition"
-                                        >
-                                            👁️ Ver
-                                        </button>
-
-                                        {onEdit && (userRole === 'admin' || userRole === 'encargado') && (
-                                            <button
-                                                onClick={() => onEdit(venta)}
-                                                className="text-orange-500 hover:text-orange-700 font-medium text-xs px-2 py-1 min-h-[36px] bg-orange-50 rounded hover:bg-orange-100 transition"
-                                            >
-                                                ✏️ Editar
-                                            </button>
+                                        <Button variant="ghost" size="sm" onClick={() => setSelectedSale(venta)}>👁️ Ver</Button>
+                                        {onEdit && isAdminOrEncargado && (
+                                            <Button variant="warning" size="sm" onClick={() => onEdit(venta)}>✏️ Editar</Button>
                                         )}
-
-                                        {(userRole === 'admin' || userRole === 'encargado') && (
-                                            <button
-                                                onClick={() => handleDelete(venta)}
-                                                className="text-red-500 hover:text-red-700 font-medium text-xs px-2 py-1 min-h-[36px] bg-red-50 rounded hover:bg-red-100 transition"
-                                            >
-                                                🗑️ Eliminar
-                                            </button>
+                                        {isAdminOrEncargado && (
+                                            <Button variant="danger" size="sm" onClick={() => handleDelete(venta)}>🗑️ Eliminar</Button>
                                         )}
                                     </td>
                                 </tr>
@@ -258,74 +193,62 @@ export default function SalesTable({ sucursalId, refreshTrigger, userRole, onDel
                 </table>
             </div>
 
-            {/* Modal Ver Detalles */}
             {selectedSale && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 relative animate-in zoom-in duration-200">
-                        <button
-                            onClick={() => setSelectedSale(null)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl"
-                        >
-                            ✕
-                        </button>
-
-                        <h3 className="text-xl font-bold text-gray-800 mb-1">
-                            Detalle Venta #{selectedSale.id}
-                        </h3>
-                        <p className="text-sm text-gray-500 mb-4">
-                            {new Date(selectedSale.fecha).toLocaleString()}
-                        </p>
-
-                        <div className="bg-gray-50 p-4 rounded-lg mb-4 space-y-2 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-gray-600">Cliente:</span>
-                                <span className="font-medium">{selectedSale.cliente_nombre || 'Consumidor Final'}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-600">Vendedor:</span>
-                                <span className="font-medium">{selectedSale.vendedor_nombre || '-'}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-600">Tipo:</span>
-                                <span className="uppercase font-medium">{selectedSale.tipo_venta}</span>
-                            </div>
-                        </div>
-
-                        <div className="mb-6">
-                            <h4 className="font-bold text-gray-700 mb-2 text-sm uppercase">Items</h4>
-                            <div className="bg-white border rounded-lg p-3 max-h-40 overflow-y-auto">
-                                <div className="text-sm text-gray-600 whitespace-pre-wrap">
-                                    {(selectedSale.items_resumen || '').split(', ').map((item, i) => (
-                                        <div key={i} className="py-1 border-b last:border-0 border-gray-100">
-                                            • {item}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-between items-center mb-6 pt-4 border-t">
-                            <span className="font-bold text-xl text-black">Total</span>
-                            <span className="font-bold text-2xl text-blue-600">${selectedSale.total.toFixed(2)}</span>
-                        </div>
-
-                        <div className="flex gap-3">
-                            <button
+                <Dialog
+                    isOpen={!!selectedSale}
+                    onClose={() => setSelectedSale(null)}
+                    title={`Detalle Venta #${selectedSale.id}`}
+                    footer={
+                        <div className="flex gap-3 w-full">
+                            <Button 
+                                variant="primary" 
+                                className="flex-1 bg-gray-800 hover:bg-gray-900" 
                                 onClick={() => window.open(`/ticket/${selectedSale.id}`, '_blank')}
-                                className="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2"
                             >
                                 📄 Ver Ticket PDF
-                            </button>
-                            <button
-                                onClick={() => setSelectedSale(null)}
-                                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg"
-                            >
-                                Cerrar
-                            </button>
+                            </Button>
+                            <Button variant="secondary" className="flex-1" onClick={() => setSelectedSale(null)}>Cerrar</Button>
+                        </div>
+                    }
+                >
+                    <p className="text-sm text-gray-500 -mt-2 mb-4">
+                        {new Date(selectedSale.fecha).toLocaleString()}
+                    </p>
+
+                    <div className="bg-gray-50 p-4 rounded-lg mb-4 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-gray-600">Cliente:</span>
+                            <span className="font-medium">{selectedSale.cliente_nombre || 'Consumidor Final'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-600">Vendedor:</span>
+                            <span className="font-medium">{selectedSale.vendedor_nombre || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-600">Tipo:</span>
+                            <span className="uppercase font-medium">{selectedSale.tipo_venta}</span>
                         </div>
                     </div>
-                </div>
+
+                    <div className="mb-6">
+                        <h4 className="font-bold text-gray-700 mb-2 text-sm uppercase">Items</h4>
+                        <div className="bg-white border rounded-lg p-3 max-h-40 overflow-y-auto">
+                            <div className="text-sm text-gray-600 whitespace-pre-wrap">
+                                {(selectedSale.items_resumen || '').split(', ').map((item, i) => (
+                                    <div key={i} className="py-1 border-b last:border-0 border-gray-100">
+                                        • {item}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-4 border-t">
+                        <span className="font-bold text-xl text-black">Total</span>
+                        <span className="font-bold text-2xl text-blue-600">${selectedSale.total.toFixed(2)}</span>
+                    </div>
+                </Dialog>
             )}
-        </div>
+        </Card>
     );
 }

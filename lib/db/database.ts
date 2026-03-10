@@ -12,7 +12,7 @@ const pool = new Pool({
 });
 
 // Helper para ejecutar queries de forma asíncrona
-export const query = (text: string, params?: any[]) => pool.query(text, params);
+export const query = (text: string, params?: unknown[]) => pool.query(text, params);
 
 // Función para inicializar la base de datos en PostgreSQL
 export async function initDatabase() {
@@ -110,7 +110,7 @@ export async function initDatabase() {
     await client.query('SAVEPOINT migration_usuario_id_ventas');
     try {
       await client.query('ALTER TABLE ventas ADD COLUMN IF NOT EXISTS usuario_id INTEGER REFERENCES usuarios(id)');
-    } catch (e) {
+    } catch {
       await client.query('ROLLBACK TO SAVEPOINT migration_usuario_id_ventas');
       // Ignorar si falla (ej. ya existe)
     }
@@ -170,7 +170,7 @@ export async function initDatabase() {
     try {
       await client.query('ALTER TABLE presupuestos DROP CONSTRAINT IF EXISTS presupuestos_venta_id_fkey');
       await client.query('ALTER TABLE presupuestos ADD CONSTRAINT presupuestos_venta_id_fkey FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE SET NULL');
-    } catch (e) {
+    } catch {
       await client.query('ROLLBACK TO SAVEPOINT migration_presupuestos_constraint');
       console.log('⚠️ Nota: No se pudo actualizar la constraint de presupuestos');
     }
