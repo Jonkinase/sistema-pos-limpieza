@@ -32,10 +32,6 @@ export default function InventarioPage() {
     stock_actual: '0',
   });
 
-  const handleFormChange = (field: string, value: string) => {
-    setFormProducto(prev => ({ ...prev, [field]: value }));
-  };
-
   const { data: authData, isError: isAuthError } = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: api.auth.me,
@@ -106,32 +102,34 @@ export default function InventarioPage() {
     onError: (err: Error) => toast.error(err.message || 'Error al eliminar producto')
   });
 
-  const handleSave = () => {
-    if (!formProducto.nombre || !formProducto.precio_minorista) {
-      toast.error('Nombre y Precio Minorista son obligatorios');
-      return;
-    }
-    
+  const handleSave = (data: {
+    nombre: string;
+    tipo: string;
+    precio_minorista: number;
+    precio_mayorista: number;
+    litros_minimo_mayorista: number;
+    stock_actual: number;
+  }) => {
     if (isEditing && productoEditando) {
       editarProductoMutation.mutate({
-        prod: { id: productoEditando.id, nombre: formProducto.nombre, tipo: formProducto.tipo, litros_minimo_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.litros_minimo_mayorista) : undefined },
+        prod: { id: productoEditando.id, nombre: data.nombre, tipo: data.tipo, litros_minimo_mayorista: data.tipo === 'liquido' ? data.litros_minimo_mayorista : undefined },
         stock: {
           producto_id: productoEditando.id,
           sucursal_id: sucursalSeleccionada!,
-          cantidad_litros: parseFloat(formProducto.stock_actual),
-          precio_minorista: parseFloat(formProducto.precio_minorista),
-          precio_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : parseFloat(formProducto.precio_minorista),
+          cantidad_litros: data.stock_actual,
+          precio_minorista: data.precio_minorista,
+          precio_mayorista: data.tipo === 'liquido' ? (data.precio_mayorista || data.precio_minorista) : data.precio_minorista,
           activo: 1
         }
       });
     } else {
       crearProductoMutation.mutate({
-        nombre: formProducto.nombre,
-        tipo: formProducto.tipo,
-        precio_minorista: parseFloat(formProducto.precio_minorista),
-        precio_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.precio_mayorista || formProducto.precio_minorista) : (formProducto.tipo === 'alimento' ? parseFloat(formProducto.precio_minorista) : null),
-        litros_minimo_mayorista: formProducto.tipo === 'liquido' ? parseFloat(formProducto.litros_minimo_mayorista) : undefined,
-        stock_inicial: parseFloat(formProducto.stock_actual || '0'),
+        nombre: data.nombre,
+        tipo: data.tipo,
+        precio_minorista: data.precio_minorista,
+        precio_mayorista: data.tipo === 'liquido' ? (data.precio_mayorista || data.precio_minorista) : (data.tipo === 'alimento' ? data.precio_minorista : null),
+        litros_minimo_mayorista: data.tipo === 'liquido' ? data.litros_minimo_mayorista : undefined,
+        stock_inicial: data.stock_actual || 0,
         sucursal_id: sucursalSeleccionada!
       });
     }
@@ -227,7 +225,6 @@ export default function InventarioPage() {
             sucursales={sucursales} 
             sucursalSeleccionada={sucursalSeleccionada} 
             formProducto={formProducto} 
-            onFormChange={handleFormChange} 
             onSave={handleSave} 
             loading={isPending} 
           />

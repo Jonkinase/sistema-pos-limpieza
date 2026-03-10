@@ -1,240 +1,126 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { UserForm } from '@/components/users/UserForm';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { api } from '@/lib/api';
+import { User, Sucursal } from '@/lib/types';
 
-type User = {
-    id: number;
-    nombre: string;
-    email: string;
-    rol: string;
-    sucursal_id: number | null;
-    sucursal_nombre: string | null;
-    creado_en: string;
-};
-
-type Sucursal = {
-    id: number;
-    nombre: string;
-};
+interface UserFormData {
+  nombre: string;
+  email: string;
+  password: string;
+  rol: 'admin' | 'encargado' | 'vendedor';
+  sucursal_id: string;
+}
 
 export default function UsuariosPage() {
     const router = useRouter();
-    const [usuarios, setUsuarios] = useState<User[]>([]);
-    const [sucursales, setSucursales] = useState<Sucursal[]>([]);
-    const [user, setUser] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
 
-    // Form states
-    const [nombre, setNombre] = useState('');
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [rol, setRol] = useState('vendedor');
-    const [sucursalId, setSucursalId] = useState('');
-    const [creating, setCreating] = useState(false);
+    const { data: authData, isLoading: authLoading, isError: isAuthError } = useQuery({
+        queryKey: ['auth', 'me'],
+        queryFn: api.auth.me,
+        retry: false
+    });
+    const currentUser = authData?.user || null;
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    if (isAuthError) {
+        router.push('/login');
+    }
 
-    const fetchData = async () => {
-        try {
-            // Cargar info del usuario actual
-            const resMe = await fetch('/api/auth/me');
-            const dataMe = await resMe.json();
-            if (dataMe.success) {
-                setUser(dataMe.user);
-                if (dataMe.user.rol === 'encargado') {
-                    setSucursalId(dataMe.user.sucursal_id.toString());
-                    setRol('vendedor');
-                }
+    const { data: sucursalesData } = useQuery({
+        queryKey: ['sucursales'],
+        queryFn: api.sucursales.getAll,
+        enabled: !!currentUser
+    });
+    const sucursales = sucursalesData?.sucursales || [];
+
+    const { data: usuariosData, isLoading: usersLoading } = useQuery({
+        queryKey: ['usuarios'],
+        queryFn: async () => {
+            const res = await fetch('/api/usuarios');
+            if (res.status === 401 || res.status === 403) {
+                throw new Error('No autorizado');
             }
+            return res.json();
+        },
+        enabled: !!currentUser
+    });
+    const usuarios = (usuariosData?.usuarios as (User & { sucursal_nombre: string })[]) || [];
 
-            // Cargar sucursales para el form
-            const resSuc = await fetch('/api/productos');
-            const dataSuc = await resSuc.json();
-            setSucursales(dataSuc.sucursales || []);
-
-            // Cargar usuarios
-            const resUsers = await fetch('/api/usuarios');
-            if (resUsers.status === 401 || resUsers.status === 403) {
-                alert('⛔ No tienes permisos para ver esta sección');
-                router.push('/');
-                return;
-            }
-            const dataUsers = await resUsers.json();
-            if (dataUsers.success) {
-                setUsuarios(dataUsers.usuarios);
-            }
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!nombre || !email || !password) {
-            alert('Todos los campos son obligatorios');
-            return;
-        }
-
-        if ((rol === 'vendedor' || rol === 'encargado') && !sucursalId) {
-            alert('Debes asignar una sucursal');
-            return;
-        }
-
-        setCreating(true);
-        try {
+    const createUserMutation = useMutation({
+        mutationFn: async (data: UserFormData) => {
             const res = await fetch('/api/usuarios', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    nombre,
-                    email,
-                    password,
-                    rol,
-                    sucursal_id: (rol === 'vendedor' || rol === 'encargado') ? Number(sucursalId) : null
+                    ...data,
+                    sucursal_id: (data.rol === 'vendedor' || data.rol === 'encargado') ? Number(data.sucursal_id) : null
                 })
             });
+            const result = await res.json();
+            if (!result.success) throw new Error(result.error);
+            return result;
+        },
+        onSuccess: () => {
+            toast.success('Usuario creado correctamente');
+            queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+        },
+        onError: (err: Error) => toast.error(err.message || 'Error al crear usuario')
+    });
 
-            const data = await res.json();
-            if (data.success) {
-                alert('✅ Usuario creado correctamente');
-                setNombre('');
-                setEmail('');
-                setPassword('');
-                fetchData(); // Reload list
-            } else {
-                alert('❌ Error: ' + data.error);
-            }
-        } catch (error) {
-            alert('Error al crear usuario');
-        }
-        setCreating(false);
-    };
-
-    const handleDelete = async (id: number) => {
-        if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
-
-        try {
+    const deleteUserMutation = useMutation({
+        mutationFn: async (id: number) => {
             const res = await fetch(`/api/usuarios?id=${id}`, { method: 'DELETE' });
-            const data = await res.json();
-            if (data.success) {
-                setUsuarios(prev => prev.filter(u => u.id !== id));
-            } else {
-                alert('❌ Error: ' + data.error);
-            }
-        } catch (error) {
-            alert('Error al eliminar usuario');
+            const result = await res.json();
+            if (!result.success) throw new Error(result.error);
+            return result;
+        },
+        onSuccess: () => {
+            toast.success('Usuario eliminado');
+            queryClient.invalidateQueries({ queryKey: ['usuarios'] });
+        },
+        onError: (err: Error) => toast.error(err.message || 'Error al eliminar usuario')
+    });
+
+    const handleDelete = (id: number) => {
+        if (confirm('¿Estás seguro de eliminar este usuario?')) {
+            deleteUserMutation.mutate(id);
         }
     };
 
-    if (loading) return <div className="p-8 text-center">Cargando...</div>;
+    if (authLoading || usersLoading) return <div className="p-8 text-center">Cargando...</div>;
+
+    if (currentUser?.rol !== 'admin' && currentUser?.rol !== 'encargado') {
+        toast.error('No tienes permisos');
+        router.push('/');
+        return null;
+    }
 
     return (
         <div className="min-h-screen bg-gray-100 p-6">
             <div className="max-w-5xl mx-auto">
                 <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-6">
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">👥 Gestión de Usuarios</h1>
-                    <Link
-                        href="/"
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"
-                    >
-                        🏠 Volver al Inicio
+                    <Link href="/">
+                        <Button variant="primary">🏠 Volver al Inicio</Button>
                     </Link>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <UserForm 
+                        currentUser={currentUser} 
+                        sucursales={sucursales} 
+                        onSave={(data) => createUserMutation.mutate(data)} 
+                        loading={createUserMutation.isPending} 
+                    />
 
-                    {/* Formulario de Creación */}
-                    <div className="bg-white rounded-xl shadow-md p-6 h-fit">
-                        <h2 className="text-xl font-bold text-gray-700 mb-4">Nuevo Usuario</h2>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Nombre</label>
-                                <input
-                                    type="text"
-                                    required
-                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-base text-gray-900"
-                                    value={nombre}
-                                    onChange={e => setNombre(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Email</label>
-                                <input
-                                    type="email"
-                                    required
-                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-base text-gray-900"
-                                    value={email}
-                                    onChange={e => setEmail(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Contraseña</label>
-                                <input
-                                    type="password"
-                                    required
-                                    minLength={4}
-                                    className="w-full mt-1 p-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500 text-base text-gray-900"
-                                    value={password}
-                                    onChange={e => setPassword(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Rol</label>
-                                <select
-                                    className="w-full mt-1 p-2 border rounded-lg bg-white text-base text-gray-900"
-                                    value={rol}
-                                    onChange={e => setRol(e.target.value)}
-                                >
-                                    <option value="vendedor">Vendedor</option>
-                                    {user?.rol === 'admin' && (
-                                        <>
-                                            <option value="encargado">Encargado</option>
-                                            <option value="admin">Administrador</option>
-                                        </>
-                                    )}
-                                </select>
-                            </div>
-
-                            {(rol === 'vendedor' || rol === 'encargado') && (
-                                <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-                                    <label className="block text-sm font-medium text-gray-700">Asignar Sucursal</label>
-                                    <select
-                                        required
-                                        disabled={user?.rol === 'encargado'}
-                                        className={`w-full mt-1 p-2 border-2 border-orange-200 rounded-lg bg-orange-50 text-base text-gray-900 ${user?.rol === 'encargado' ? 'opacity-70 cursor-not-allowed' : ''}`}
-                                        value={user?.rol === 'encargado' ? user.sucursal_id : sucursalId}
-                                        onChange={e => setSucursalId(e.target.value)}
-                                    >
-                                        {user?.rol === 'admin' && <option value="">Selecciona una sucursal...</option>}
-                                        {sucursales.map(s => (
-                                            <option key={s.id} value={s.id}>{s.nombre}</option>
-                                        ))}
-                                    </select>
-                                    <p className="text-xs text-orange-600 mt-1">
-                                        ⚠️ {user?.rol === 'encargado' ? 'Como encargado, tus vendedores se asignan a tu local.' : 'El vendedor solo podrá operar en esta sucursal.'}
-                                    </p>
-                                </div>
-                            )}
-
-                            <button
-                                type="submit"
-                                disabled={creating}
-                                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow transition-colors"
-                            >
-                                {creating ? 'Creando...' : '✨ Crear Usuario'}
-                            </button>
-                        </form>
-                    </div>
-
-                    {/* Lista de Usuarios */}
-                    <div className="lg:col-span-2 bg-white rounded-xl shadow-md p-6">
-                        <h2 className="text-xl font-bold text-gray-700 mb-4">Usuarios Registrados</h2>
+                    <Card className="lg:col-span-2" title="Usuarios Registrados">
                         <div className="md:hidden space-y-3">
                             {usuarios.map(u => (
                                 <div key={u.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
@@ -252,13 +138,13 @@ export default function UsuariosPage() {
                                         <span className="text-sm text-gray-600">{u.sucursal_nombre || '-'}</span>
                                     </div>
                                     <div className="pt-2 border-t border-gray-200">
-                                        <button
+                                        <Button 
+                                            variant="danger" 
+                                            size="sm" 
                                             onClick={() => handleDelete(u.id)}
-                                            className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded transition-colors"
-                                            title="Eliminar usuario"
                                         >
                                             🗑️ Eliminar
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
                             ))}
@@ -293,20 +179,21 @@ export default function UsuariosPage() {
                                                 {u.sucursal_nombre || '-'}
                                             </td>
                                             <td className="px-4 py-3 text-right">
-                                                <button
+                                                <Button 
+                                                    variant="danger" 
+                                                    size="sm" 
                                                     onClick={() => handleDelete(u.id)}
-                                                    className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-2 rounded transition-colors"
-                                                    title="Eliminar usuario"
+                                                    aria-label="Eliminar usuario"
                                                 >
                                                     🗑️
-                                                </button>
+                                                </Button>
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                    </div>
+                    </Card>
                 </div>
             </div>
         </div>

@@ -3,6 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "./providers";
 import { Toaster } from "sonner";
+import { getServerUser } from "@/lib/auth-server";
+import { getSucursales } from "@/lib/db/database";
+import { Sucursal } from "@/lib/types";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,11 +23,14 @@ export const metadata: Metadata = {
 };
 
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const user = await getServerUser();
+  const sucursales = await getSucursales() as Sucursal[];
+
   return (
     <html lang="es">
       <head>
@@ -33,7 +39,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}
       >
-        <Providers>
+        <Providers initialUser={user} initialSucursales={sucursales}>
           {children}
           <Toaster position="top-right" richColors />
         </Providers>

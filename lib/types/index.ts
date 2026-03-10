@@ -52,6 +52,7 @@ export type User = {
     id: number;
     nombre: string;
     usuario: string;
+    email: string;
     rol: 'admin' | 'encargado' | 'vendedor';
     sucursal_id: number | null;
 };

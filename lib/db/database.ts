@@ -14,6 +14,11 @@ const pool = new Pool({
 // Helper para ejecutar queries de forma asíncrona
 export const query = (text: string, params?: unknown[]) => pool.query(text, params);
 
+export async function getSucursales() {
+  const res = await query('SELECT id, nombre FROM sucursales WHERE activo = 1 ORDER BY nombre ASC');
+  return res.rows;
+}
+
 // Función para inicializar la base de datos en PostgreSQL
 export async function initDatabase() {
   const client = await pool.connect();
